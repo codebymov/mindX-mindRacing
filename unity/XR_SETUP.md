@@ -40,6 +40,13 @@ Two physical build configs: **Standalone/Windows** (Vive, Varjo, Quest-Link) and
 
 ## 2. Project Settings — OpenXR
 
+> **Status (already applied in this repo):** OpenXR is the active loader on both
+> Standalone and Android. Enabled interaction profiles — Standalone: HTC Vive,
+> Valve Index, KHR Simple (generic/Varjo fallback), Meta Quest Touch Pro, Oculus
+> Touch, + Eye Gaze. Android: Meta Quest Touch Pro, Oculus Touch, + Eye Gaze.
+> Player settings already correct (Standalone IL2CPP/.NET Standard 2.1; Android
+> IL2CPP/ARM64/minSDK 29). The steps below document how to reproduce/extend it.
+
 **Edit → Project Settings → XR Plug-in Management**
 - Enable **OpenXR** on **both** the *PC/Standalone* and *Android* tabs.
 - Remove any vendor-loader (Oculus, etc.) — OpenXR only.

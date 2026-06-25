@@ -26,6 +26,19 @@ unity/UserSettings/
 *.csproj
 *.sln
 
+# Stray Unity project regenerated at the MONOREPO ROOT (the real project is in
+# unity/). A misdirected Unity Editor sometimes recreates an empty shell here;
+# these root-anchored ignores keep that junk out of git. They do NOT affect
+# unity/Assets, unity/Packages, etc. (those are not at the repo root).
+/Assets/
+/Packages/
+/ProjectSettings/
+/Library/
+/Logs/
+/Temp/
+/obj/
+/UserSettings/
+
 # IDE
 .vs/
 .idea/

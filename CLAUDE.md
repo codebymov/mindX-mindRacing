@@ -160,6 +160,9 @@ See `backend/README.md`. Key entry points:
 ## 7. Open questions / decisions not yet made
 
 Tracked in `docs/DECISIONS.md`. When you resolve one, move it there with the
-rationale. Current big ones: final XR device (Vision Pro vs Quest Pro vs
-HoloLens 2), transport to Unity (LSL outlet vs websocket), and the exact INS
-windowing trade-off (latency vs. coherence stability).
+rationale. Recently decided: **XR runtime = OpenXR baseline targeting HTC Vive /
+Quest Pro / Varjo XR-4, built against OpenXR extensions not vendor SDKs (D6)**,
+and **one dyadic INS signal → one shared cooperative car in track-local space
+(D7)**. Still open: transport to Unity (LSL outlet vs websocket), the INS
+windowing trade-off (latency vs. coherence stability), and multiplayer scene
+sync for the shared MR view (O5). See `unity/XR_SETUP.md` for the build recipe.

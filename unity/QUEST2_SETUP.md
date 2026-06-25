@@ -1,5 +1,13 @@
 # Quest 2 Setup — Merge BEDRILL Track into XR Scene
 
+> ⚠️ **SUPERSEDED — see [`XR_SETUP.md`](XR_SETUP.md).**
+> The device/rig/two-car parts of this doc are obsolete: the project now targets
+> **OpenXR** (HTC Vive / Quest Pro / Varjo XR-4) with **one shared cooperative
+> car** in **track-local** space (`docs/DECISIONS.md` D6, D7). This file is kept
+> only for its vendor-neutral mechanical steps (Build Settings, URP material
+> conversion, VS solution regen). Do **not** follow the Quest-2 / two-car /
+> world-space-track instructions below.
+
 Main scene: **`Assets/Scenes/MindXRacing.unity`**  
 Reference layout: **`Assets/Scenes/_Reference/PhotonConnection.unity`**
 

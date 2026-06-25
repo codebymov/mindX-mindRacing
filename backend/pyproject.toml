@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mindx-hnf"
+version = "0.1.0"
+description = "fNIRS Hyperscanning-Neurofeedback real-time backend (mindX / START-program)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+hardware = ["pylsl>=1.16"]   # real LSL streams (NIRSport2, movisens)
+analysis = ["mne>=1.6", "scipy>=1.11"]  # offline track only
+dev = ["pytest>=8.0", "ruff>=0.4", "black>=24.0", "mypy>=1.9"]
+
+[project.scripts]
+mindx-simulate = "mindx_hnf.scripts.simulate:main"
+
+[tool.setuptools.packages.find]
+include = ["mindx_hnf*"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

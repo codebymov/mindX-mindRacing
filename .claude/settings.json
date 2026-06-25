@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest*)",
+      "Bash(python -m mindx_hnf.scripts.simulate*)",
+      "Bash(ruff*)",
+      "Bash(black*)",
+      "Bash(mypy*)",
+      "Bash(pip install -e*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)"
+    ]
+  }
+}

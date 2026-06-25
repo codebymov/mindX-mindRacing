@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Data & artifacts (never commit participant data)
+data/
+*.snirf
+*.xdf
+*.nwb
+bids/
+
+# Unity
+unity/Library/
+unity/Temp/
+unity/Obj/
+unity/Logs/
+unity/UserSettings/
+*.csproj
+*.sln
+
+# IDE
+.vs/
+.idea/
+.vscode/
+
+# Claude Code (machine-local settings & permissions)
+.claude/settings.local.json
+
+# Env / secrets
+.env
+*.local.yaml

@@ -1,0 +1,85 @@
+# ── mindX repository .gitattributes ─────────────────────────────────────────
+# Goals:
+#  1. ONE canonical line ending (LF) for all text, so Windows / WSL / the Unity
+#     editor stop re-flipping CRLF on every save (this is what produced the
+#     800+ phantom .meta diffs). LF matches the line ending already in history.
+#  2. Correct diff/merge handling for Unity YAML assets.
+#  3. Declare the large binary asset types — these are the recommended Git LFS
+#     types for a Unity project (see the NOTE at the bottom; LFS is not yet
+#     enabled in this repo).
+
+# Default: detect text vs binary automatically; normalize text to LF in the repo.
+* text=auto eol=lf
+
+# ── Source / config text ─────────────────────────────────────────────────────
+*.cs              text eol=lf diff=csharp
+*.py              text eol=lf diff=python
+*.md              text eol=lf
+*.txt             text eol=lf
+*.json            text eol=lf
+*.yml             text eol=lf
+*.yaml            text eol=lf
+*.xml             text eol=lf
+*.shader          text eol=lf
+*.cginc           text eol=lf
+*.hlsl            text eol=lf
+*.compute         text eol=lf
+*.asmdef          text eol=lf
+
+# ── Unity YAML assets: text, LF, smart 3-way merge via UnityYAMLMerge ─────────
+*.meta            text eol=lf merge=unityyamlmerge
+*.unity           text eol=lf merge=unityyamlmerge
+*.asset           text eol=lf merge=unityyamlmerge
+*.prefab          text eol=lf merge=unityyamlmerge
+*.mat             text eol=lf merge=unityyamlmerge
+*.anim            text eol=lf merge=unityyamlmerge
+*.controller      text eol=lf merge=unityyamlmerge
+*.overrideController text eol=lf merge=unityyamlmerge
+*.physicMaterial  text eol=lf merge=unityyamlmerge
+*.preset          text eol=lf merge=unityyamlmerge
+*.mask            text eol=lf merge=unityyamlmerge
+*.spriteatlas     text eol=lf merge=unityyamlmerge
+
+# ── Binary assets: never normalize line endings ──────────────────────────────
+# NOTE — Git LFS: these are also the recommended LFS-tracked types for Unity.
+# LFS is NOT yet enabled here (git-lfs is not installed, and a few large assets
+# are already in plain history). To enable it correctly BEFORE the first push,
+# follow the LFS steps in the README / commit message: install git-lfs, run
+# `git lfs install`, `git lfs track "*.png" …` (which rewrites the lines below
+# to add `filter=lfs diff=lfs merge=lfs`), then `git lfs migrate import` to move
+# existing large blobs out of plain history.
+*.fbx             binary
+*.FBX             binary
+*.obj             binary
+*.blend           binary
+*.png             binary
+*.jpg             binary
+*.jpeg            binary
+*.gif             binary
+*.psd             binary
+*.tga             binary
+*.tif             binary
+*.tiff            binary
+*.bmp             binary
+*.exr             binary
+*.hdr             binary
+*.cubemap         binary
+*.wav             binary
+*.mp3             binary
+*.ogg             binary
+*.aif             binary
+*.aiff            binary
+*.mp4             binary
+*.mov             binary
+*.webm            binary
+*.ttf             binary
+*.otf             binary
+*.dll             binary
+*.so              binary
+*.a               binary
+*.lib             binary
+*.dylib           binary
+*.bundle          binary
+*.unitypackage    binary
+*.chm             binary
+*.pdf             binary

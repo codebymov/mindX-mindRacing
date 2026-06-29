@@ -70,3 +70,18 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ── Third-party package / sample documentation (not our source) ──────────────
+# Imported Unity samples ship their own README/CHANGELOG/docs. Ignore them WITH
+# their .meta so Unity never sees an orphaned meta file. Our own docs live in
+# /docs and the repo-root README.md, which are NOT under Assets and stay tracked.
+[Aa]ssets/**/README.md
+[Aa]ssets/**/README.md.meta
+[Aa]ssets/**/CHANGELOG.md
+[Aa]ssets/**/CHANGELOG.md.meta
+[Aa]ssets/**/LICENSE.md
+[Aa]ssets/**/LICENSE.md.meta
+[Aa]ssets/**/Documentation~/
+# Heavy vendor doc blobs that don't belong in git history
+*.chm
+*.chm.meta

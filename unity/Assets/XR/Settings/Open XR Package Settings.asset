@@ -429,7 +429,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f6bfdbcb316ed242b30a8798c9eb853, type: 3}
   m_Name: KHRSimpleControllerProfile Standalone
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   m_enabled: 1
   nameUi: Khronos Simple Controller Profile
   version: 0.0.1
@@ -489,7 +489,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0d6ccd3d0ef0f1d458e69421dccbdae1, type: 3}
   m_Name: ValveIndexControllerProfile Standalone
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   m_enabled: 1
   nameUi: Valve Index Controller Profile
   version: 0.0.1
@@ -1357,7 +1357,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b3cf79659a011bd419c7a2a30eb74e9a, type: 3}
   m_Name: EyeGazeInteraction Android
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   m_enabled: 1
   nameUi: Eye Gaze Interaction Profile
   version: 0.0.1

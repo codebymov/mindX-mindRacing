@@ -48,19 +48,33 @@ everyone — same policy as LSL4Unity):
 
 ## 2. Wire the scene
 
-On the **shared car** GameObject (a child of the track root, in track-local space):
-- `UbiqSharedCarNetwork` — set `isAuthority = true` **only in the lab-host build/
-  scene**; leave it false on the headset clients.
-- `SharedCarAuthority` — set `trackRoot`, `car`, optional `engine` AudioSource,
-  `streamName = mindx_feedback`, and `carSubjectIndex` (-1 for the shared
-  Hyperscanning car; 0/1 for Individual-mode per-player cars).
+### The shared car — spawned, not scene-placed
+So all three peers get an instance with a **matching NetworkId**, the car is
+**spawned via Ubiq**, not placed in the scene:
+1. Make a **car prefab** whose root has `UbiqSharedCarNetwork` (implements
+   `INetworkSpawnable`) + `SharedCarAuthority`, plus the car body/audio as
+   children. Set on `SharedCarAuthority`: `trackRoot`, `car`, optional `engine`
+   AudioSource, `streamName = mindx_feedback`, and `carSubjectIndex` (-1 = shared
+   Hyperscanning car; 0/1 = Individual-mode per-player cars).
+2. Register that prefab in the **`NetworkScene`'s `PrefabCatalogue`**.
+3. Put a **`SharedCarSpawner`** in the scene, assign the car prefab, and set
+   `spawnAsAuthority = true` **only in the lab-host scene/build**. On Start the
+   host spawns the car room-scoped and promotes its own instance to authority;
+   clients receive the instance as renderers (`isAuthority = false`).
 
-On **each headset rig**:
+### Each headset rig — co-location + avatar
 - `ColocationRegistration` — set `trackRoot`. At session start the operator marks
   the physical origin + a forward point with the controller trigger; the track
   root snaps to the shared origin. Do this on **both** headsets against the **same
-  physical marks**.
-- Ubiq avatar prefab (from the Ubiq samples) so each player sees the other.
+  physical marks**. Add `CalibrationUIController` (+ a world-space Canvas Text/TMP
+  bound to its `PromptChanged`) to guide the two steps on screen.
+- **Avatar (mutual presence).** Add Ubiq's **`AvatarManager`** and set its local
+  avatar prefab to a **three-point (head + two hands)** avatar
+  (`ThreePointTrackedAvatar`, from the Ubiq XR samples). Ubiq drives it from the
+  local rig's HMD + controller poses and replicates it, so each player sees the
+  other's head and hands — enough to point at the shared car. (Full-body IK is a
+  later upgrade; head+hands is the recommended default for a seated dyad — see
+  DECISIONS O5.)
 
 ## 3. Run order
 
@@ -83,9 +97,17 @@ On **each headset rig**:
 
 ## Status / not-yet
 
-- `UbiqSharedCarNetwork.cs` needs the Ubiq package to compile (step 1) — this is
-  scaffolding pending an in-editor build + verification pass, like the LSL4Unity
-  transport was.
-- Avatar prefab wiring, the calibration UI/prompts for `ColocationRegistration`,
-  and spawning the car via Ubiq's `NetworkSpawner` (so the `NetworkId` matches
-  across peers) are the next O5 steps.
+Done (code): the seam (`ISharedCarNetwork`), Ubiq adapter
+(`UbiqSharedCarNetwork`), host↔client glue (`SharedCarAuthority`), room-scoped
+spawn (`SharedCarSpawner`), co-location (`ColocationRegistration`) with step
+events, and the calibration prompts (`CalibrationUIController`).
+
+Still manual / next:
+- **Install the Ubiq package + run the room server + in-editor compile/verify**
+  (step 1). The Ubiq-dependent scripts (`UbiqSharedCarNetwork`,
+  `SharedCarSpawner`) only compile once the package is present — scaffolding
+  pending an Editor build pass, like the LSL4Unity transport was.
+- Build the **car prefab** + register it in the `PrefabCatalogue`.
+- Add the **`AvatarManager`** + a three-point avatar prefab, and a world-space
+  Canvas bound to `CalibrationUIController.PromptChanged`.
+- Confirm the exact **Ubiq UPM path** for the current release.

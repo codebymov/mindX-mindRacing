@@ -127,11 +127,18 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   (D12 = Ubiq). **Integration in progress:** the seam (`ISharedCarNetwork` /
   `SharedCarState`), the Ubiq adapter (`UbiqSharedCarNetwork`), the host↔client
   glue (`SharedCarAuthority`, LSL→car→replicate), and co-location
-  (`ColocationRegistration`) are scaffolded — see `docs/UBIQ_SETUP.md`. Remaining:
-  Ubiq package install + in-editor build/verify, spawning the car via Ubiq's
-  `NetworkSpawner` (shared `NetworkId`), avatar prefab wiring + fidelity, a
-  calibration UI for co-location, and whether P1/P2 also get an ICarInput steering
-  role (ties O6). Owner: VCI.
+  (`ColocationRegistration`) are scaffolded — see `docs/UBIQ_SETUP.md`. Room-scoped
+  car spawn (`SharedCarSpawner`, matching `NetworkId`) and a guided co-location UI
+  (`CalibrationUIController`, step events) are scaffolded too. **Proposed defaults
+  (VCI may override):** (a) **avatar = three-point head + two hands** (Ubiq
+  `ThreePointTrackedAvatar`) — matches the hardware, lowest complexity, enough for
+  mutual presence + pointing; full-body IK is a later upgrade; (b) the shared INS
+  car stays a **pure neurofeedback passenger — no manual steering** — because D7
+  makes the joint-INS drive THE cooperative mechanic, and adding motor control
+  would confound the neurofeedback signal (a steered/agent SECOND car is the
+  separate O6 question, not the shared car). Remaining manual: Ubiq package install
+  + in-editor build/verify, the car prefab + PrefabCatalogue, AvatarManager
+  wiring. Owner: VCI.
 - **O6 — Second car: role & controller per game mode.** The shared INS car (D7)
   stays the science instrument and is unchanged. A *second* car is wanted for
   non-hyperscanning modes: in **multi-user** it is another participant's car; in

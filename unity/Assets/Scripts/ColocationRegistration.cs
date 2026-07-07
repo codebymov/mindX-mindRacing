@@ -25,6 +25,10 @@ namespace MindX
 {
     public class ColocationRegistration : MonoBehaviour
     {
+        /// Calibration progress, so a UI can prompt the operator (see
+        /// CalibrationUIController).
+        public enum Step { NeedOrigin, NeedForward, Registered }
+
         [Tooltip("The track root to place = the shared co-located origin (D7/D11).")]
         [SerializeField] private Transform trackRoot;
         [Tooltip("Which hand registers the points.")]
@@ -33,11 +37,23 @@ namespace MindX
         /// Fired once both points are captured and the track root is placed.
         public event Action Registered;
 
+        /// Fired whenever the calibration step changes (drives prompts).
+        public event Action<Step> StepChanged;
+
         public bool IsRegistered { get; private set; }
+        public Step CurrentStep { get; private set; } = Step.NeedOrigin;
 
         private bool _haveOrigin;
         private Vector3 _origin;
         private bool _triggerWasDown;
+
+        void Start() => StepChanged?.Invoke(CurrentStep);
+
+        private void SetStep(Step step)
+        {
+            CurrentStep = step;
+            StepChanged?.Invoke(step);
+        }
 
         void Update()
         {
@@ -63,6 +79,7 @@ namespace MindX
                 _origin = worldPoint;
                 _haveOrigin = true;
                 Debug.Log("[MindX] Co-location: origin captured; now mark the forward point.");
+                SetStep(Step.NeedForward);
                 return;
             }
 
@@ -82,6 +99,7 @@ namespace MindX
             IsRegistered = true;
             _haveOrigin = false; // allow re-registration if needed
             Debug.Log($"[MindX] Co-location registered: origin={_origin}, yaw set from forward mark.");
+            SetStep(Step.Registered);
             Registered?.Invoke();
         }
 
@@ -91,6 +109,7 @@ namespace MindX
         {
             IsRegistered = false;
             _haveOrigin = false;
+            SetStep(Step.NeedOrigin);
         }
     }
 }

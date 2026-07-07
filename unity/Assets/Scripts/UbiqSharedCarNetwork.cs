@@ -27,6 +27,12 @@ namespace MindX
 
         public bool IsAuthority => isAuthority;
 
+        /// Promote/demote this instance's authority role. A room-scoped spawn
+        /// instantiates the SAME prefab on every peer (isAuthority = false), so
+        /// the lab-host that spawned it calls this on its own returned instance to
+        /// become the single authority. See SharedCarSpawner.
+        public void SetAuthority(bool value) => isAuthority = value;
+
         private NetworkContext _context;
         private SharedCarState _latest;
         private bool _have;

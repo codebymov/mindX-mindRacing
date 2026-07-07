@@ -43,6 +43,23 @@ class FeedbackMode(str, Enum):
     SHAM = "sham"  # replays another dyad's signal for the same session/task
 
 
+class SessionMode(str, Enum):
+    """Which neurofeedback paradigm a session runs (see DECISIONS.md D8).
+
+    This is orthogonal to FeedbackMode (real/sham): a session runs in exactly
+    ONE SessionMode, and every delivered sample — real or sham — is stamped with
+    it. It selects *what signal drives the cars*, not whether the signal is
+    genuine.
+    """
+
+    #: One joint INS signal drives BOTH cars together (the core science of D7).
+    #: FeedbackSample.subject is None — there is one shared dyad signal.
+    HYPERSCANNING = "hyperscanning"
+    #: Each car is driven by that player's OWN per-subject neurofeedback (NOT
+    #: interpersonal synchrony). Each delivered sample carries a `subject`.
+    INDIVIDUAL = "individual"
+
+
 # --------------------------------------------------------------------------- #
 # Real-time frames
 # --------------------------------------------------------------------------- #
@@ -103,12 +120,20 @@ class FeedbackSample:
     the game maps onto car speed and audio pitch/gain. `mode` records whether the
     source was real or sham — for logging only; the participant-facing path is
     identical for both.
+
+    `session_mode` and `subject` route the sample to the right car(s) (D8):
+      - HYPERSCANNING: one joint signal drives both cars; `subject` is None.
+      - INDIVIDUAL:    per-subject neurofeedback; `subject` names the car's owner.
+    Neither field may be branched on anywhere a participant could perceive a
+    difference — the sham hard-rule applies to every session mode.
     """
 
     t_lsl: float
     level: float
     mode: FeedbackMode
     raw_ins: float
+    session_mode: SessionMode = SessionMode.HYPERSCANNING
+    subject: SubjectId | None = None
 
 
 # --------------------------------------------------------------------------- #

@@ -56,6 +56,14 @@ move it to "Decided" with the date and rationale, in the same commit as the code
 
 ## Open
 
+- **O7 — Per-subject neurofeedback feature for Individual mode.** D8's contract
+  seam is in (`FeedbackSample` carries `session_mode` + `subject`; the mapper is
+  per-subject in Individual mode). What is NOT built is the *signal* that feeds
+  Individual mode: a per-subject NF feature (e.g. per-subject HbO/HbR band power
+  or a within-subject synchrony surrogate) computed causally on the hot path,
+  distinct from the joint INS. Open: which feature, computed where (a per-subject
+  estimator alongside `ins/`, or in `preprocessing/`), and its baseline/normalization.
+  Hyperscanning (the joint-INS shared car) is unaffected and remains the default.
 - **O2 — Transport to Unity: LSL outlet vs websocket.** LSL keeps one clock and
   fits the existing fabric; websocket is simpler on the Unity side but needs
   explicit time handling. Abstracted behind `api.FeedbackSink` so either works.

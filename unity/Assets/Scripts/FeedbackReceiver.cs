@@ -20,10 +20,13 @@ namespace MindX
     /// with backend/mindx_hnf/contracts.py::FeedbackSample.
     public struct FeedbackSample
     {
-        public double tLsl;   // LSL-clock timestamp (single clock of record)
-        public float level;   // normalized, baseline-corrected, smoothed [0,1]
-        public string mode;   // "real" | "sham" — for logging ONLY, never branch on it
-        public float rawIns;  // pre-mapping INS, for logging
+        public double tLsl;        // LSL-clock timestamp (single clock of record)
+        public float level;        // normalized, baseline-corrected, smoothed [0,1]
+        public string mode;        // "real" | "sham" — for logging ONLY, never branch on it
+        public float rawIns;       // pre-mapping INS, for logging
+        public string sessionMode; // "hyperscanning" | "individual" (DECISIONS.md D8)
+        public string subject;     // null/empty = shared dyad car (hyperscanning);
+                                   // a subject id routes to that player's car (individual)
     }
 
     /// Transport-agnostic source of feedback samples.

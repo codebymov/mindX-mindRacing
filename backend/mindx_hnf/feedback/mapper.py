@@ -5,7 +5,13 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterator
 
-from mindx_hnf.contracts import FeedbackMode, FeedbackSample, INSSample
+from mindx_hnf.contracts import (
+    FeedbackMode,
+    FeedbackSample,
+    INSSample,
+    SessionMode,
+    SubjectId,
+)
 
 
 class ShamProvider:
@@ -46,6 +52,13 @@ class BaselineSmoothingMapper:
 
     In sham mode the *raw INS value is swapped for the sham provider's value
     BEFORE this mapping*, so steps 1-4 are byte-for-byte identical across modes.
+
+    A mapper instance belongs to exactly one session mode (D8). In HYPERSCANNING
+    a single mapper produces the one shared-car sample (`subject=None`). In
+    INDIVIDUAL each subject gets its OWN mapper (own baseline + smoothing state)
+    constructed with that subject's id, so the per-subject cars stay independent.
+    The mapping math is unchanged either way — `session_mode`/`subject` are only
+    stamped onto the output for routing and provenance.
     """
 
     def __init__(
@@ -55,11 +68,23 @@ class BaselineSmoothingMapper:
         smoothing: float = 0.3,
         gain: float = 1.0,
         baseline_window: int = 64,
+        session_mode: SessionMode = SessionMode.HYPERSCANNING,
+        subject: SubjectId | None = None,
     ) -> None:
+        if session_mode is SessionMode.HYPERSCANNING and subject is not None:
+            raise ValueError(
+                "Hyperscanning mode drives one shared car; subject must be None."
+            )
+        if session_mode is SessionMode.INDIVIDUAL and subject is None:
+            raise ValueError(
+                "Individual mode drives a per-subject car; subject is required."
+            )
         self.sham = sham
         self.smoothing = smoothing
         self.gain = gain
-        self._baseline = deque(maxlen=baseline_window)
+        self.session_mode = session_mode
+        self.subject = subject
+        self._baseline: deque[float] = deque(maxlen=baseline_window)
         self._smoothed = 0.0
         self._baseline_locked = False
         self._baseline_value = 0.0
@@ -90,7 +115,12 @@ class BaselineSmoothingMapper:
         )
         level = min(1.0, max(0.0, self._smoothed))
         return FeedbackSample(
-            t_lsl=ins.t_lsl, level=level, mode=mode, raw_ins=raw
+            t_lsl=ins.t_lsl,
+            level=level,
+            mode=mode,
+            raw_ins=raw,
+            session_mode=self.session_mode,
+            subject=self.subject,
         )
 
     def reset(self) -> None:

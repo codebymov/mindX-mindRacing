@@ -85,6 +85,17 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   Full plan + verified findings: `docs/MNE_ONLINE_SCOPE.md`. Supersedes the
   earlier "MNE = offline analysis only" framing.
 
+- **D12 — O5 netcode = Ubiq, self-hosted on the lab LAN (2026-07-07).** Resolves
+  the O5 netcode sub-decision. Ubiq (UCL, Apache-2.0) is self-hostable with no
+  third-party/cloud services, is built for VR *research* (session/room model,
+  GDPR-safe), and co-locates on the same offline LAN as the LSL streams — matching
+  the one-clock / reproducibility / no-PII hard rules. Rejected: Photon Fusion 2 /
+  Normcore (cloud relay → external dep + uncontrolled latency in a soft-real-time
+  loop); Mirror was the close runner-up (MIT, self-hostable) and stays the
+  fallback if VCI has existing Mirror expertise. The Ubiq-specific networking sits
+  behind a thin authority seam (`ISharedCarNetwork`) so the choice is swappable,
+  per D1. Owner: VCI (may override on existing-expertise grounds).
+
 - **D11 — Co-location = deterministic manual controller registration
   (2026-07-07).** Both headsets agree on one real-world origin by pointing a
   tracked controller at shared physical fiducial(s) at session start; each inverts
@@ -112,12 +123,15 @@ move it to "Decided" with the date and rationale, in the same commit as the code
 - **O4 — Exact INS estimator.** Welch-coherence baseline is in; whether to move
   to true Morlet wavelet coherence (and which scales) depends on pilot stability.
 - **O5 — Multiplayer scene sync for the shared MR view.** Architecture scoped in
-  `docs/O5_MULTIPLAYER_SCOPE.md`; co-location resolved (D11). Remaining
-  sub-decision: the **netcode library** — self-hosted **Ubiq** (Apache-2.0,
-  research/GDPR fit) or **Mirror** (MIT, simple) recommended over cloud-relay
-  Photon Fusion 2 / Normcore, for reproducibility + no-cloud/no-PII on the lab
-  LAN. Also open: avatar fidelity, whether P1/P2 get a steering role (ties O6),
-  and lab-host placement (dedicated PC preferred). Owner: VCI.
+  `docs/O5_MULTIPLAYER_SCOPE.md`; co-location resolved (D11); netcode resolved
+  (D12 = Ubiq). **Integration in progress:** the seam (`ISharedCarNetwork` /
+  `SharedCarState`), the Ubiq adapter (`UbiqSharedCarNetwork`), the host↔client
+  glue (`SharedCarAuthority`, LSL→car→replicate), and co-location
+  (`ColocationRegistration`) are scaffolded — see `docs/UBIQ_SETUP.md`. Remaining:
+  Ubiq package install + in-editor build/verify, spawning the car via Ubiq's
+  `NetworkSpawner` (shared `NetworkId`), avatar prefab wiring + fidelity, a
+  calibration UI for co-location, and whether P1/P2 also get an ICarInput steering
+  role (ties O6). Owner: VCI.
 - **O6 — Second car: role & controller per game mode.** The shared INS car (D7)
   stays the science instrument and is unchanged. A *second* car is wanted for
   non-hyperscanning modes: in **multi-user** it is another participant's car; in

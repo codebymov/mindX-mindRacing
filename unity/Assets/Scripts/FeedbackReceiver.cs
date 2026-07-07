@@ -6,18 +6,20 @@
 // the "mind racing" cooperation task, and reads back nothing — feedback is
 // one-directional from brains to game.
 //
-// Transport is an open decision (see docs/DECISIONS.md O2): LSL inlet or
-// websocket. This stub abstracts that so the game logic is transport-agnostic.
-//
-// This file is a SCAFFOLD: it pins the contract and the mapping seam. Wire up
-// the chosen transport (LSL4Unity or a websocket client) where marked.
+// Transport is LSL (DECISIONS.md D9, resolving O2): LslFeedbackTransport wraps
+// an LSL4Unity inlet on the "mindx_feedback" stream. It stays behind
+// IFeedbackTransport so this component is transport-agnostic and testable with a
+// mock. Attach one FeedbackReceiver per car; `carSubjectIndex` routes samples:
+// a Hyperscanning sample (shared, subjectIndex < 0) drives every car, while an
+// Individual sample drives only the car whose owner it names (D8).
 
 using UnityEngine;
 
 namespace MindX
 {
     /// Mirror of the backend FeedbackSample. Keep field names/semantics in sync
-    /// with backend/mindx_hnf/contracts.py::FeedbackSample.
+    /// with backend/mindx_hnf/contracts.py::FeedbackSample and the channel order
+    /// in api/sink.py::FEEDBACK_CHANNELS.
     public struct FeedbackSample
     {
         public double tLsl;        // LSL-clock timestamp (single clock of record)
@@ -25,8 +27,9 @@ namespace MindX
         public string mode;        // "real" | "sham" — for logging ONLY, never branch on it
         public float rawIns;       // pre-mapping INS, for logging
         public string sessionMode; // "hyperscanning" | "individual" (DECISIONS.md D8)
-        public string subject;     // null/empty = shared dyad car (hyperscanning);
-                                   // a subject id routes to that player's car (individual)
+        public int subjectIndex;   // -1 = shared dyad car (hyperscanning); else the
+                                   // owning subject's index (individual) — used to route
+        public string subject;     // decoded subject id for logging (null when shared)
     }
 
     /// Transport-agnostic source of feedback samples.
@@ -38,6 +41,14 @@ namespace MindX
 
     public class FeedbackReceiver : MonoBehaviour
     {
+        [Header("Transport (LSL)")]
+        [Tooltip("LSL stream published by the backend (LSLOutletSink).")]
+        [SerializeField] private string streamName = "mindx_feedback";
+        [Tooltip("Auto-resolve the LSL stream on Start. Turn off to inject a transport via AttachTransport (tests/mocks).")]
+        [SerializeField] private bool autoConnect = true;
+        [Tooltip("Which car this is (0, 1, ...). Shared/Hyperscanning samples drive every car regardless.")]
+        [SerializeField] private int carSubjectIndex = 0;
+
         [Header("Mapping (game feel lives in the backend; these are limits)")]
         [SerializeField] private float baseSpeed = 5f;     // fixed base velocity
         [SerializeField] private float maxBonusSpeed = 15f; // added at level == 1
@@ -51,13 +62,35 @@ namespace MindX
         private IFeedbackTransport _transport;
         private float _currentLevel;
 
+        void Start()
+        {
+            if (autoConnect && _transport == null)
+            {
+                try
+                {
+                    _transport = new LslFeedbackTransport(streamName);
+                    Debug.Log($"[MindX] FeedbackReceiver connected to LSL '{streamName}'.");
+                }
+                catch (System.Exception e)
+                {
+                    // Degrade gracefully: no stream yet just means the car idles
+                    // at baseSpeed. Never hang or throw in a live session.
+                    Debug.LogWarning($"[MindX] No feedback stream yet ({e.Message}). " +
+                                     "Car idles until the backend publishes.");
+                }
+            }
+        }
+
         // CRITICAL: do NOT branch on sample.mode anywhere a participant could
         // perceive a difference. Sham must be indistinguishable from real.
         void Update()
         {
             if (_transport != null && _transport.TryGetLatest(out var s))
             {
-                _currentLevel = Mathf.Clamp01(s.level);
+                // Route: shared (Hyperscanning) sample drives every car; an
+                // Individual sample drives only its owning car.
+                if (s.subjectIndex < 0 || s.subjectIndex == carSubjectIndex)
+                    _currentLevel = Mathf.Clamp01(s.level);
                 // TODO: log (s.tLsl, s.level, s.mode, s.rawIns) for offline analysis.
             }
 
@@ -72,13 +105,10 @@ namespace MindX
             }
         }
 
+        /// Inject a transport explicitly (e.g. a mock in tests, or a shared
+        /// transport). Disables the need for autoConnect.
         public void AttachTransport(IFeedbackTransport transport) => _transport = transport;
 
         void OnDestroy() => _transport?.Close();
     }
-
-    // TODO: implement LslFeedbackTransport (LSL4Unity StreamInlet on
-    // "mindx_feedback") and/or WebSocketFeedbackTransport. Both implement
-    // IFeedbackTransport so FeedbackReceiver doesn't change when the
-    // O2 transport decision is made.
 }

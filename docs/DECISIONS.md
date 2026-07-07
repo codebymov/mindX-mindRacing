@@ -54,6 +54,22 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   idea from O6 becomes a variant of Individual mode (the 2nd car's driver is an
   ML-Agent instead of a remote player) — still open, not yet built.
 
+- **D9 — Transport to Unity = LSL (2026-07-07).** Resolves O2. Feedback is
+  published as an LSL stream (`api.sink.LSLOutletSink`, stream `mindx_feedback`)
+  and consumed by an LSL4Unity inlet (`unity/.../LslFeedbackTransport.cs`).
+  Rationale: keeps the game on the **one clock of record** (D3) — each sample is
+  pushed with its own backend LSL timestamp, not a fresh one — and lets the
+  feedback stream be recorded into the same XDF as the neural streams for
+  reproducibility. Websocket was the alternative (simpler on the Unity side) but
+  would have forced manual time handling and a second clock. The sample is one
+  5-channel float32 vector (`level, raw_ins, mode, session_mode, subject_index`);
+  string fields are encoded numerically and decoded on the Unity side for logging
+  only (never branched on — sham hard-rule). Both headsets subscribe to the same
+  stream, so both get the identical joint signal. **Scope note:** LSL carries the
+  *feedback signal* to both headsets; it does NOT synchronize game state /
+  positions / a shared world anchor — that is O5 (multiplayer scene sync), still
+  open. Setup recipe: `docs/LSL_UNITY_SETUP.md`.
+
 ## Open
 
 - **O7 — Per-subject neurofeedback feature for Individual mode.** D8's contract

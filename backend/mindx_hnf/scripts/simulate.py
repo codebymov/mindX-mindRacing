@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from mindx_hnf.api.sink import NullSink
+from mindx_hnf.api.sink import FeedbackSink, NullSink
 from mindx_hnf.contracts import FeedbackMode
 from mindx_hnf.feedback.mapper import BaselineSmoothingMapper, ShamProvider
 from mindx_hnf.ins.coherence import WaveletCoherenceINS
@@ -25,7 +25,11 @@ from mindx_hnf.session.protocol import Block, SessionPlan, SessionScheduler
 from mindx_hnf.contracts import BlockType
 
 
-def build_demo(mode: FeedbackMode = FeedbackMode.REAL, fast: bool = True):
+def build_demo(
+    mode: FeedbackMode = FeedbackMode.REAL,
+    fast: bool = True,
+    sink: FeedbackSink | None = None,
+):
     fs = 7.81
     subjects = ("sub-01", "sub-02")
     n_channels = 20
@@ -59,7 +63,8 @@ def build_demo(mode: FeedbackMode = FeedbackMode.REAL, fast: bool = True):
     ins = WaveletCoherenceINS(subjects, fs, window_s=20.0 * scale + 2, update_every_s=1.0)
     sham = ShamProvider([0.3, 0.32, 0.35, 0.31, 0.34] * 50)
     mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=2.0)
-    sink = NullSink()
+    if sink is None:
+        sink = NullSink()
     scheduler = SessionScheduler(plan)
 
     orch = Orchestrator(
@@ -77,6 +82,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="mindX Hyper-NF loop simulator")
     parser.add_argument("--sham", action="store_true", help="run in sham mode")
     parser.add_argument("--full", action="store_true", help="use full-length blocks")
+    parser.add_argument(
+        "--lsl",
+        action="store_true",
+        help="publish feedback over LSL (stream 'mindx_feedback') for Unity to "
+        "subscribe to, instead of discarding it. Requires the [hardware] extra.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -86,10 +97,17 @@ def main() -> None:
     )
 
     mode = FeedbackMode.SHAM if args.sham else FeedbackMode.REAL
-    orch, sink = build_demo(mode=mode, fast=not args.full)
+    sink: FeedbackSink | None = None
+    if args.lsl:
+        from mindx_hnf.api.sink import LSLOutletSink
+
+        sink = LSLOutletSink(subjects=("sub-01", "sub-02"))
+        print("Publishing feedback on LSL stream 'mindx_feedback' — "
+              "connect Unity (LslFeedbackTransport) now.")
+    orch, sink = build_demo(mode=mode, fast=not args.full, sink=sink)
     stats = orch.run()
 
-    levels = [s.level for s in sink.published]
+    levels = [s.level for s in getattr(sink, "published", [])]
     print(f"\nmode={mode.value}")
     print(f"frames={stats.n_frames} ins={stats.n_ins} feedback={stats.n_feedback}")
     print(f"loop latency: mean={stats.mean_loop_latency_ms:.2f}ms "

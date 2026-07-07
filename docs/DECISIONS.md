@@ -70,6 +70,32 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   positions / a shared world anchor — that is O5 (multiplayer scene sync), still
   open. Setup recipe: `docs/LSL_UNITY_SETUP.md`.
 
+- **D10 — MNE-NIRS is used in the real-time pipeline, not only offline
+  (2026-07-07).** MNE-NIRS's validated fNIRS numerics (extinction coefficients,
+  Beer-Lambert MBLL) are load-bearing in the ONLINE preprocessing, applied
+  causally. This does not weaken D3/causality: MBLL is a fixed linear operator
+  (empirically verified) so it runs per-frame; optical density keeps MNE's
+  formula but references a causal baseline-block mean instead of the
+  whole-recording mean; MNE's batch/zero-phase functions (TDDR, filtfilt) stay as
+  OFFLINE ORACLES that the causal online approximations are unit-tested against.
+  Pattern: **MNE builds the operator once at construction; numpy applies it on the
+  hot path** (no per-frame `Raw`). Implies: `mne`+`scipy` move from the
+  `[analysis]` extra to core runtime deps; a real optode **montage** becomes a
+  first-class config; the synthetic source must emit wavelength-paired intensities.
+  Full plan + verified findings: `docs/MNE_ONLINE_SCOPE.md`. Supersedes the
+  earlier "MNE = offline analysis only" framing.
+
+- **D11 — Co-location = deterministic manual controller registration
+  (2026-07-07).** Both headsets agree on one real-world origin by pointing a
+  tracked controller at shared physical fiducial(s) at session start; each inverts
+  to a shared origin transform. Rationale: cross-vendor cloud/anchor co-location
+  does NOT exist in 2026 — Meta Shared Spatial Anchors are Quest-only + cloud-gated,
+  OpenXR anchor extensions standardize the API but define no cross-runtime anchor
+  interchange, and camera/QR is Quest-3-class only. Manual controller registration
+  is the ONLY method that works across the D6 set (Vive/Quest Pro/Varjo), and it is
+  the most reproducible (no cloud, no Meta account, no PII) — the registered origin
+  IS the D7 track-local root. Full analysis: `docs/O5_MULTIPLAYER_SCOPE.md`.
+
 ## Open
 
 - **O7 — Per-subject neurofeedback feature for Individual mode.** D8's contract
@@ -80,17 +106,18 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   distinct from the joint INS. Open: which feature, computed where (a per-subject
   estimator alongside `ins/`, or in `preprocessing/`), and its baseline/normalization.
   Hyperscanning (the joint-INS shared car) is unaffected and remains the default.
-- **O2 — Transport to Unity: LSL outlet vs websocket.** LSL keeps one clock and
-  fits the existing fabric; websocket is simpler on the Unity side but needs
-  explicit time handling. Abstracted behind `api.FeedbackSink` so either works.
 - **O3 — INS windowing trade-off.** Longer window = more stable coherence but
   more feedback latency / slower responsiveness; shorter = jumpier but snappier.
   Tune against pilot data; the estimator exposes `window_s` / `update_every_s`.
 - **O4 — Exact INS estimator.** Welch-coherence baseline is in; whether to move
   to true Morlet wavelet coherence (and which scales) depends on pilot stability.
-- **O5 — Multiplayer scene sync for the shared MR view.** Both headsets must show
-  the *same* shared car/track at the same physical position (see D7). Photon
-  (already in the project) vs alternatives. Owner: VCI (multiuser VR expertise).
+- **O5 — Multiplayer scene sync for the shared MR view.** Architecture scoped in
+  `docs/O5_MULTIPLAYER_SCOPE.md`; co-location resolved (D11). Remaining
+  sub-decision: the **netcode library** — self-hosted **Ubiq** (Apache-2.0,
+  research/GDPR fit) or **Mirror** (MIT, simple) recommended over cloud-relay
+  Photon Fusion 2 / Normcore, for reproducibility + no-cloud/no-PII on the lab
+  LAN. Also open: avatar fidelity, whether P1/P2 get a steering role (ties O6),
+  and lab-host placement (dedicated PC preferred). Owner: VCI.
 - **O6 — Second car: role & controller per game mode.** The shared INS car (D7)
   stays the science instrument and is unchanged. A *second* car is wanted for
   non-hyperscanning modes: in **multi-user** it is another participant's car; in

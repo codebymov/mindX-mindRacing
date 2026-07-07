@@ -142,6 +142,11 @@ The Python package is `mindx_hnf`. Import as `from mindx_hnf.ins import coherenc
   `INSEstimator` protocol, add a test in `tests/test_ins.py`.
 - Touching preprocessing → keep it causal; add it to the online pipeline only if
   it has a streaming-capable implementation. Otherwise it belongs in `analysis/`.
+  **MNE-NIRS is used online** (D10) for its *causal-safe* numerics — the
+  Beer-Lambert MBLL operator and extinction tables — built once at construction
+  and applied per-frame with numpy; MNE's batch/zero-phase functions stay as
+  offline oracles the causal versions are tested against. See
+  `docs/MNE_ONLINE_SCOPE.md`.
 - Game/feedback feel → the *mapping* lives in `feedback/` (backend, testable);
   the *rendering* lives in `unity/`. Keep them separated by a thin contract.
 - New experiment block / protocol change → `session/` + `configs/`.
@@ -160,9 +165,11 @@ See `backend/README.md`. Key entry points:
 ## 7. Open questions / decisions not yet made
 
 Tracked in `docs/DECISIONS.md`. When you resolve one, move it there with the
-rationale. Recently decided: **XR runtime = OpenXR baseline targeting HTC Vive /
-Quest Pro / Varjo XR-4, built against OpenXR extensions not vendor SDKs (D6)**,
-and **one dyadic INS signal → one shared cooperative car in track-local space
-(D7)**. Still open: transport to Unity (LSL outlet vs websocket), the INS
-windowing trade-off (latency vs. coherence stability), and multiplayer scene
-sync for the shared MR view (O5). See `unity/XR_SETUP.md` for the build recipe.
+rationale. Recently decided: **OpenXR baseline for HTC Vive / Quest Pro / Varjo
+XR-4 (D6)**; **one dyadic INS signal → one shared cooperative car (D7)**, refined
+to **two cars + two switchable session modes (D8)**; **transport to Unity = LSL
+(D9)** — see `docs/LSL_UNITY_SETUP.md`; and **MNE-NIRS used online for its causal
+numerics (D10)** — see `docs/MNE_ONLINE_SCOPE.md`. Still open: the INS windowing
+trade-off (latency vs. coherence stability, O3/O4), and **multiplayer scene sync
+for the shared per-player MR view (O5)** — see `docs/O5_MULTIPLAYER_SCOPE.md`.
+See `unity/XR_SETUP.md` for the build recipe.

@@ -68,7 +68,15 @@ class SyntheticSource:
         coherence_fn=None,
         seed: int = 0,
         duration_s: float | None = None,
+        montage=None,
     ) -> None:
+        # With a montage, emit wavelength-paired intensities in the montage's
+        # channel order so the MNE Beer-Lambert MBLL path can run end-to-end on
+        # synthetic data (D10). The signal model is unchanged; only the channel
+        # count is pinned to the montage layout.
+        if montage is not None:
+            n_channels = montage.n_raw_channels
+        self.montage = montage
         self.n_channels = n_channels
         self.fs = fs
         self.chunk_samples = chunk_samples

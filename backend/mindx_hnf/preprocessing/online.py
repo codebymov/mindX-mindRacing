@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from mindx_hnf.contracts import HemoFrame, RawFrame, SubjectId
+from mindx_hnf.preprocessing.montage import BeerLambertOperator, Montage
 
 
 class _CausalBandpass:
@@ -51,7 +52,15 @@ class OnlineHemoPipeline:
 
     Per subject it keeps: a running DC reference for optical-density conversion
     and a causal bandpass with retained state. Converts intensity -> OD ->
-    (placeholder) concentration and bandpasses in the hemodynamic band.
+    concentration and bandpasses in the hemodynamic band.
+
+    MBLL (D10): if a ``montage`` is given, HbO/HbR come from the MNE-NIRS
+    Beer-Lambert operator (validated extinction coefficients + PPF), applied
+    causally per frame as a numpy matmul — the operator is built ONCE from MNE at
+    construction (see preprocessing/montage.py) and never touched on the hot path.
+    Raw intensity must then be wavelength-paired in the montage's channel order
+    (``montage.n_raw_channels`` rows). Without a montage the pipeline falls back
+    to the earlier placeholder mapping so the montage-free path keeps working.
     """
 
     def __init__(
@@ -60,17 +69,19 @@ class OnlineHemoPipeline:
         n_channels: int,
         fs: float,
         band: tuple[float, float] = (0.01, 0.1),
+        montage: Montage | None = None,
     ) -> None:
         self.subjects = subjects
         self.fs = fs
         self.band = band
+        self.montage = montage
+        self._op = BeerLambertOperator.from_montage(montage) if montage else None
+        # Bandpass runs on the concentration channels: n_pairs with a montage,
+        # else the raw channel count.
+        out_channels = montage.n_pairs if montage else n_channels
         self._dc: dict[SubjectId, np.ndarray | None] = {s: None for s in subjects}
-        self._bp_hbo = {
-            s: _CausalBandpass(n_channels, fs, *band) for s in subjects
-        }
-        self._bp_hbr = {
-            s: _CausalBandpass(n_channels, fs, *band) for s in subjects
-        }
+        self._bp_hbo = {s: _CausalBandpass(out_channels, fs, *band) for s in subjects}
+        self._bp_hbr = {s: _CausalBandpass(out_channels, fs, *band) for s in subjects}
 
     def process(self, frame: RawFrame) -> HemoFrame:
         hbo: dict[SubjectId, np.ndarray] = {}
@@ -83,17 +94,19 @@ class OnlineHemoPipeline:
             dc = chunk_dc if dc is None else 0.99 * dc + 0.01 * chunk_dc
             self._dc[s] = dc
             od = -np.log(np.clip(intensity, 1e-6, None) / np.clip(dc, 1e-6, None))
-            # --- MBLL placeholder: HbO/HbR as two linear combinations of OD ---
-            # TODO(claude-code): replace with extinction-coefficient matrix and
-            # measured differential pathlength factor per wavelength pair.
-            hbo_raw = od
-            hbr_raw = -0.6 * od
+            # --- modified Beer-Lambert -> Δ[HbO]/[HbR] ---
+            if self._op is not None:
+                hbo_raw, hbr_raw = self._op.apply(od)  # MNE operator (D10)
+            else:
+                # Placeholder mapping for the montage-free path.
+                hbo_raw = od
+                hbr_raw = -0.6 * od
             # --- causal bandpass ---
             hbo[s] = self._bp_hbo[s](hbo_raw)
             hbr[s] = self._bp_hbr[s](hbr_raw)
             # TODO(claude-code): TDDR motion correction (causal variant) and
-            # short-distance-channel regression go here, before/after bandpass
-            # per fNIRS best practice (docs/PROTOCOL.md).
+            # short-distance-channel regression go here (Phase 2, D10), validated
+            # against the MNE batch versions as oracles.
         return HemoFrame(t_lsl=frame.t_lsl, hbo=hbo, hbr=hbr, fs=self.fs)
 
     def reset(self) -> None:

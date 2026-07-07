@@ -94,8 +94,14 @@ family across acquisition + preprocessing.
 
 ## Suggested phasing
 
-- **Phase 1 (highest value, low risk):** montage config + synthetic source paired
-  channels + **online MBLL via MNE operator** + OD causal baseline + oracle tests.
-  This replaces the two biggest correctness placeholders with validated numerics.
-- **Phase 2:** causal TDDR (windowed) + short-channel regression, each vs MNE oracle.
+- **Phase 1 — DONE (2026-07-07).** `configs/montage_demo.yaml` (PFC + rTPJ + a
+  short channel), `preprocessing/montage.py` (MNE Info + `BeerLambertOperator`
+  extracted by probing MNE, scaled to µM), `OnlineHemoPipeline(montage=...)`
+  applying MBLL per frame as a numpy matmul with causal OD, and a paired
+  `SyntheticSource(montage=...)`. Tests (`tests/test_montage_mbll.py`) pin the
+  operator == MNE batch to <1e-9 µM, causality, and an end-to-end synthetic run.
+  `mne`+`scipy` are now core deps. The montage-free path is unchanged.
+- **Phase 2 (next):** causal TDDR (windowed) + short-channel regression (the
+  montage already flags the short channel), each vs the MNE batch oracle. Also:
+  freeze the OD reference at baseline-block lock (currently a causal EMA).
 - **Phase 3:** MNE `LSLClient` option for `io/LSLSource` when hardware arrives.

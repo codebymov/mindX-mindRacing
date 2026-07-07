@@ -10,11 +10,13 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "pyyaml>=6.0",
+    "mne>=1.6",      # ONLINE Beer-Lambert MBLL numerics (D10), + offline oracle
+    "scipy>=1.11",   # signal math backing mne / causal filters
 ]
 
 [project.optional-dependencies]
 hardware = ["pylsl>=1.16"]   # real LSL streams (NIRSport2, movisens)
-analysis = ["mne>=1.6", "scipy>=1.11"]  # offline track only
+analysis = ["pymc>=5.0", "arviz>=0.18"]  # offline-only heavy stats (WP5)
 dev = ["pytest>=8.0", "ruff>=0.4", "black>=24.0", "mypy>=1.9"]
 
 [project.scripts]
@@ -27,9 +29,9 @@ include = ["mindx_hnf*"]
 line-length = 90
 target-version = "py311"
 
-# pylsl ships no type stubs / py.typed marker; don't fail mypy on its imports.
+# These ship no type stubs / py.typed marker; don't fail mypy on their imports.
 [[tool.mypy.overrides]]
-module = ["pylsl"]
+module = ["pylsl", "mne", "mne.*", "yaml"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

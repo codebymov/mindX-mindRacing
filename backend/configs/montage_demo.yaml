@@ -1,0 +1,25 @@
+# Demo optode montage — PFC + right TPJ, per docs/PROTOCOL.md ("probe optimized
+# for PFC + rTPJ; short channels for physiological-noise regression").
+#
+# This is a SMALL stand-in layout for development/CI (real geometry comes from the
+# camera-based channel registration at run time). Only the source-detector
+# distance and the wavelengths drive the Beer-Lambert MBLL, so positions here are
+# schematic (metres) with realistic ~3 cm long channels and ~0.8 cm short channels.
+#
+# Consumed by preprocessing/montage.py to build the MNE Info and extract the
+# Beer-Lambert operator (D10). Channel order here IS the raw-intensity channel
+# order the source must emit (two rows per channel: 760 nm then 850 nm).
+
+name: demo_pfc_rtpj
+wavelengths: [760.0, 850.0]   # nm
+ppf: 6.0                       # partial pathlength factor (DPF proxy)
+
+channels:
+  # --- PFC (long channels, ~3 cm) ---
+  - {source: [-0.030, 0.090, 0.030], detector: [-0.001, 0.092, 0.035], short: false, region: pfc}
+  - {source: [ 0.010, 0.092, 0.036], detector: [ 0.039, 0.090, 0.030], short: false, region: pfc}
+  # --- right TPJ (long channels, ~3 cm) ---
+  - {source: [ 0.065, 0.010, 0.020], detector: [ 0.088, 0.010, 0.001], short: false, region: rtpj}
+  - {source: [ 0.070, -0.015, 0.018], detector: [ 0.090, -0.010, -0.005], short: false, region: rtpj}
+  # --- short channel (~0.8 cm) for physiological-noise regression ---
+  - {source: [-0.030, 0.090, 0.030], detector: [-0.022, 0.090, 0.031], short: true, region: pfc}

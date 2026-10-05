@@ -1,9 +1,9 @@
-"""The closed-loop orchestrator.
+r"""The closed-loop orchestrator.
 
 Wires the real-time track together:
 
     source -> preprocessor -> ins -> (baseline | feedback) -> sink
-                                          \\-> recorder (non-blocking)
+                                          \-> recorder (non-blocking)
 
 It is transport- and hardware-agnostic: pass any `FrameSource`, `INSEstimator`,
 `FeedbackMapper`, `FeedbackSink`, and a `SessionScheduler`. This is the single
@@ -34,6 +34,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LoopStats:
+    """Counters and latency figures of one orchestrator run.
+
+    Attributes:
+        n_frames: Raw frames processed.
+        n_ins: INS values produced.
+        n_feedback: Feedback samples published.
+        max_loop_latency_ms: Worst per-frame processing time.
+        mean_loop_latency_ms: Mean per-frame processing time.
+    """
+
     n_frames: int = 0
     n_ins: int = 0
     n_feedback: int = 0
@@ -42,6 +52,19 @@ class LoopStats:
 
 
 class Orchestrator:
+    """Runs the closed loop: source -> preprocess -> INS -> feedback -> sink.
+
+    Attributes:
+        source: Frame source (synthetic or LSL).
+        preprocessor: Causal per-subject preprocessing.
+        ins: Joint INS estimator.
+        mapper: INS -> feedback mapping (incl. sham substitution).
+        sink: Feedback transport to the game.
+        scheduler: Block schedule and safety boundary.
+        recorder: Optional non-blocking persistence.
+        stats: Counters of the current/last run.
+    """
+
     def __init__(
         self,
         *,
@@ -53,6 +76,17 @@ class Orchestrator:
         scheduler: SessionScheduler,
         recorder: ArtifactRecorder | None = None,
     ) -> None:
+        """Wire the stages; nothing runs until ``run``.
+
+        Args:
+            source: Frame source (synthetic or LSL).
+            preprocessor: Causal per-subject preprocessing.
+            ins: Joint INS estimator.
+            mapper: INS -> feedback mapping (incl. sham substitution).
+            sink: Feedback transport to the game; closed when the run ends.
+            scheduler: Block schedule and safety boundary.
+            recorder: Optional non-blocking persistence.
+        """
         self.source = source
         self.preprocessor = preprocessor
         self.ins = ins
@@ -63,6 +97,14 @@ class Orchestrator:
         self.stats = LoopStats()
 
     def run(self) -> LoopStats:
+        """Run the loop until the source ends or the session is finished.
+
+        Baseline-block INS establishes the feedback baseline; the preprocessor's
+        references are locked on the first frame after the baseline block.
+
+        Returns:
+            Frame/INS/feedback counts and per-frame latency.
+        """
         if self.recorder is not None:
             self.recorder.start()
         t_start = lsl_clock()

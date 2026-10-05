@@ -6,6 +6,10 @@ new preprocessing step, a new feedback mapping) are validated by conforming to
 these protocols — this is the project's equivalent of an IR contract.
 
 Keep this module dependency-light: numpy only. No I/O, no heavy imports.
+
+Attributes:
+    SubjectId: Pseudonymized subject identifier, e.g. ``"sub-01"``.
+    DyadId: Pseudonymized dyad identifier, e.g. ``"dyad-07"``.
 """
 
 from __future__ import annotations
@@ -24,6 +28,8 @@ DyadId = str  # pseudonymized, e.g. "dyad-07"
 
 
 class Chromophore(str, Enum):
+    """Hemoglobin chromophores resolved by the modified Beer-Lambert law."""
+
     HBO = "hbo"
     HBR = "hbr"
 
@@ -38,6 +44,13 @@ class BlockType(str, Enum):
 
 
 class FeedbackMode(str, Enum):
+    """Source of the delivered feedback signal (D5).
+
+    ``SHAM`` replays another dyad's real signal for the same session/task. The
+    value is recorded for analysis only; the participant-facing path is
+    identical for both modes.
+    """
+
     REAL = "real"
     SHAM = "sham"  # replays another dyad's signal for the same session/task
 
@@ -66,13 +79,16 @@ class SessionMode(str, Enum):
 class RawFrame:
     """A time-synced chunk of multimodal samples from BOTH subjects.
 
-    Assembled by `io` from the individual LSL streams. `t_lsl` is the LSL clock
-    timestamp of the chunk (the single clock of record). Channel axis ordering
+    Assembled by `io` from the individual LSL streams. Channel axis ordering
     is fixed by the montage in the run config.
 
-    Shapes:
-        fnirs[subject]: (n_channels, n_samples)   raw optical intensities
-        aux[subject]:   (n_aux_channels, n_samples) ECG/EDA/accelerometer
+    Attributes:
+        t_lsl: LSL clock timestamp of the chunk (the single clock of record).
+        fnirs: Per subject, raw optical intensities of shape
+            ``(n_channels, n_samples)``.
+        aux: Per subject, ECG/EDA/accelerometer samples of shape
+            ``(n_aux_channels, n_samples)``.
+        fs: Sampling rate in Hz.
     """
 
     t_lsl: float
@@ -85,9 +101,14 @@ class RawFrame:
 class HemoFrame:
     """Per-subject preprocessed hemodynamics after the online pipeline.
 
-    `hbo`/`hbr` shape: (n_channels, n_samples), in micromolar concentration
-    change. Already motion-corrected, bandpassed, short-channel-regressed —
-    all causally.
+    Already motion-corrected, bandpassed, short-channel-regressed — all
+    causally.
+
+    Attributes:
+        t_lsl: LSL clock timestamp of the source chunk.
+        hbo: Per subject, Δ[HbO] in micromolar, shape ``(n_channels, n_samples)``.
+        hbr: Per subject, Δ[HbR] in micromolar, shape ``(n_channels, n_samples)``.
+        fs: Sampling rate in Hz.
     """
 
     t_lsl: float
@@ -100,9 +121,12 @@ class HemoFrame:
 class INSSample:
     """A single interpersonal-neural-synchrony value at time t.
 
-    `value` is the raw estimator output (e.g. mean wavelet coherence) in [0, 1].
-    `per_channel` optionally retains the channel-resolved coherence for logging
-    and offline analysis; it must NOT be required by the feedback stage.
+    Attributes:
+        t_lsl: LSL clock timestamp the value refers to.
+        value: Raw estimator output (e.g. mean wavelet coherence) in [0, 1].
+        per_channel: Optional channel-resolved coherence for logging and
+            offline analysis; it must NOT be required by the feedback stage.
+        estimator: Name of the estimator that produced the value (provenance).
     """
 
     t_lsl: float
@@ -115,16 +139,22 @@ class INSSample:
 class FeedbackSample:
     """The signal actually delivered to the XR game.
 
-    `level` is the normalized, baseline-corrected, smoothed value in [0, 1] that
-    the game maps onto car speed and audio pitch/gain. `mode` records whether the
-    source was real or sham — for logging only; the participant-facing path is
-    identical for both.
+    ``session_mode`` and ``subject`` route the sample to the right car(s) (D8):
+    in HYPERSCANNING one joint signal drives both cars and ``subject`` is None;
+    in INDIVIDUAL the sample is per-subject neurofeedback and ``subject`` names
+    the car's owner. Neither field may be branched on anywhere a participant
+    could perceive a difference — the sham hard-rule applies to every session
+    mode.
 
-    `session_mode` and `subject` route the sample to the right car(s) (D8):
-      - HYPERSCANNING: one joint signal drives both cars; `subject` is None.
-      - INDIVIDUAL:    per-subject neurofeedback; `subject` names the car's owner.
-    Neither field may be branched on anywhere a participant could perceive a
-    difference — the sham hard-rule applies to every session mode.
+    Attributes:
+        t_lsl: LSL clock timestamp of the sample (one clock of record).
+        level: Normalized, baseline-corrected, smoothed value in [0, 1] that the
+            game maps onto car speed and audio pitch/gain.
+        mode: Whether the source was real or sham — for logging only; the
+            participant-facing path is identical for both.
+        raw_ins: The INS value before mapping, for logging.
+        session_mode: Which paradigm produced the sample (D8).
+        subject: Owning subject in Individual mode, None in Hyperscanning.
     """
 
     t_lsl: float
@@ -147,9 +177,20 @@ class OnlinePreprocessor(Protocol):
     samples — no future lookahead, no zero-phase filtering.
     """
 
-    def process(self, frame: RawFrame) -> HemoFrame: ...
+    def process(self, frame: RawFrame) -> HemoFrame:
+        """Preprocess one frame causally.
 
-    def reset(self) -> None: ...
+        Args:
+            frame: The next time-synced raw chunk from both subjects.
+
+        Returns:
+            Per-subject hemodynamics for the same chunk.
+        """
+        ...
+
+    def reset(self) -> None:
+        """Clear all internal state, as if no frame had been processed."""
+        ...
 
 
 @runtime_checkable
@@ -161,9 +202,13 @@ class BaselineLockable(Protocol):
     """
 
     @property
-    def baseline_locked(self) -> bool: ...
+    def baseline_locked(self) -> bool:
+        """Whether the reference has been frozen."""
+        ...
 
-    def lock_baseline(self) -> None: ...
+    def lock_baseline(self) -> None:
+        """Freeze the reference established during the baseline block."""
+        ...
 
 
 @runtime_checkable
@@ -171,16 +216,27 @@ class INSEstimator(Protocol):
     """Computes a single joint INS value from both subjects' hemodynamics.
 
     Implementations live in `ins/`. They are windowed and run-time efficient.
-    `name` is stamped into INSSample.estimator for provenance.
+
+    Attributes:
+        name: Stamped into ``INSSample.estimator`` for provenance.
     """
 
     name: str
 
     def update(self, frame: HemoFrame) -> INSSample | None:
-        """Push a frame; return an INSSample when a new value is ready, else None."""
+        """Push a frame and return a new INS value when one is ready.
+
+        Args:
+            frame: Preprocessed hemodynamics of both subjects.
+
+        Returns:
+            The new INS sample, or None if no update is due yet.
+        """
         ...
 
-    def reset(self) -> None: ...
+    def reset(self) -> None:
+        """Clear the window and update counters."""
+        ...
 
 
 @runtime_checkable
@@ -192,6 +248,19 @@ class FeedbackMapper(Protocol):
     'game feel' that lives in the (testable) backend rather than in Unity.
     """
 
-    def map(self, ins: INSSample, mode: FeedbackMode) -> FeedbackSample: ...
+    def map(self, ins: INSSample, mode: FeedbackMode) -> FeedbackSample:
+        """Map one INS value to the delivered feedback sample.
 
-    def reset(self) -> None: ...
+        Args:
+            ins: The raw INS sample of the real dyad.
+            mode: Real or sham; selects only the signal source, never the
+                participant-facing path.
+
+        Returns:
+            The feedback sample to publish to the game.
+        """
+        ...
+
+    def reset(self) -> None:
+        """Clear baseline, smoothing and sham-replay state."""
+        ...

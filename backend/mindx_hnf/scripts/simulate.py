@@ -35,9 +35,19 @@ def build_demo(
 ):
     """Assemble the synthetic closed loop.
 
-    With ``montage`` (a montage YAML), the source emits wavelength-paired
-    intensities with systemic physiology and the pipeline runs the full MNE path
-    (OD -> TDDR -> short-channel regression -> MNE MBLL, D10).
+    The ground-truth coherence ramps 0.1 -> 0.9, so feedback should climb.
+
+    Args:
+        mode: Real or sham feedback for the session.
+        fast: Scale block durations to 5% for a quick run.
+        sink: Feedback transport; a ``NullSink`` is used if None.
+        montage: Path to a montage YAML. With it, the source emits
+            wavelength-paired intensities with systemic physiology and the
+            pipeline runs the full MNE path (OD -> TDDR -> short-channel
+            regression -> MNE MBLL, D10).
+
+    Returns:
+        The ready-to-run orchestrator and the sink it publishes to.
     """
     fs = 7.81
     subjects = ("sub-01", "sub-02")
@@ -92,6 +102,7 @@ def build_demo(
 
 
 def main() -> None:
+    """Parse CLI flags, run the synthetic loop, and print a summary."""
     parser = argparse.ArgumentParser(description="mindX Hyper-NF loop simulator")
     parser.add_argument("--sham", action="store_true", help="run in sham mode")
     parser.add_argument("--full", action="store_true", help="use full-length blocks")

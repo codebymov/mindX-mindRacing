@@ -1,4 +1,17 @@
-"""Feedback transport sinks."""
+"""Feedback transport sinks.
+
+Sinks deliver ``FeedbackSample``s to the game. ``LSLOutletSink`` is the live
+transport (D9); ``NullSink`` collects samples for tests and simulation.
+
+Attributes:
+    MODE_CODE: Numeric code per ``FeedbackMode``, so the whole sample fits one
+        float32 LSL vector.
+    SESSION_MODE_CODE: Numeric code per ``SessionMode``.
+    SHARED_SUBJECT_INDEX: ``subject_index`` sentinel for the shared dyad signal
+        (Hyperscanning, both cars).
+    FEEDBACK_CHANNELS: Feedback stream channel layout; the order is the
+        contract with ``LslFeedbackTransport.cs``.
+"""
 
 from __future__ import annotations
 
@@ -34,21 +47,44 @@ FEEDBACK_CHANNELS: tuple[str, ...] = (
 
 
 class FeedbackSink(Protocol):
-    def publish(self, sample: FeedbackSample) -> None: ...
+    """Transport-agnostic destination for delivered feedback samples."""
 
-    def close(self) -> None: ...
+    def publish(self, sample: FeedbackSample) -> None:
+        """Deliver one sample to the game.
+
+        Args:
+            sample: The feedback sample to deliver.
+        """
+        ...
+
+    def close(self) -> None:
+        """Release the transport; later ``publish`` calls are no-ops."""
+        ...
 
 
 class NullSink:
-    """Discards samples. Used in tests/simulation when no game is attached."""
+    """Collects samples instead of sending them anywhere.
+
+    Used in tests and simulation when no game is attached.
+
+    Attributes:
+        published: Every sample passed to ``publish``, in order.
+    """
 
     def __init__(self) -> None:
+        """Create an empty sink."""
         self.published: list[FeedbackSample] = []
 
     def publish(self, sample: FeedbackSample) -> None:
+        """Record the sample.
+
+        Args:
+            sample: The feedback sample to record.
+        """
         self.published.append(sample)
 
     def close(self) -> None:
+        """Do nothing; there is no transport to release."""
         pass
 
 
@@ -71,6 +107,9 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
 
     pylsl is imported lazily so the package still imports without the optional
     ``[hardware]`` extra installed.
+
+    Attributes:
+        stream_name: Name of the published LSL stream.
     """
 
     def __init__(
@@ -81,6 +120,19 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
         source_id: str = "mindx_feedback_v1",
         fs: float = 0.0,
     ) -> None:
+        """Create and advertise the LSL outlet.
+
+        Args:
+            stream_name: LSL stream name Unity resolves.
+            subjects: Subject ids in index order; index ``i`` is sent as
+                ``subject_index == i`` and described in the stream metadata.
+            source_id: Stable LSL source id, so inlets can recover after a
+                restart.
+            fs: Nominal rate in Hz; 0 advertises an irregular rate.
+
+        Raises:
+            ImportError: If pylsl (the ``[hardware]`` extra) is not installed.
+        """
         from pylsl import IRREGULAR_RATE, StreamInfo, StreamOutlet, cf_float32
 
         self.stream_name = stream_name
@@ -106,6 +158,15 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
         self._outlet: StreamOutlet | None = StreamOutlet(info)
 
     def _subject_index(self, subject: SubjectId | None) -> float:
+        """Encode a subject id as the numeric ``subject_index`` channel.
+
+        Args:
+            subject: The owning subject, or None for the shared signal.
+
+        Returns:
+            The subject's index in ``subjects``; ``SHARED_SUBJECT_INDEX`` for
+            None or for an unknown subject.
+        """
         if subject is None:
             return SHARED_SUBJECT_INDEX
         try:
@@ -116,6 +177,11 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
             return SHARED_SUBJECT_INDEX
 
     def publish(self, sample: FeedbackSample) -> None:
+        """Push the sample with its own LSL timestamp.
+
+        Args:
+            sample: The feedback sample to encode and push.
+        """
         if self._outlet is None:
             return
         vector = [
@@ -129,4 +195,5 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
         self._outlet.push_sample(vector, timestamp=sample.t_lsl)
 
     def close(self) -> None:
+        """Drop the outlet; later ``publish`` calls are no-ops."""
         self._outlet = None

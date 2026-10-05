@@ -61,6 +61,6 @@ def test_loop_latency_under_budget():
     # loop is real-time-capable. Budget here is generous for CI machines.
     orch, _ = build_demo(mode=FeedbackMode.REAL, fast=True)
     stats = orch.run()
-    assert stats.max_loop_latency_ms < 50.0, (
-        f"per-frame processing too slow: {stats.max_loop_latency_ms:.1f}ms"
-    )
+    assert (
+        stats.max_loop_latency_ms < 50.0
+    ), f"per-frame processing too slow: {stats.max_loop_latency_ms:.1f}ms"

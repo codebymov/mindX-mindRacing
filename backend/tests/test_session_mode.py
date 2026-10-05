@@ -77,7 +77,9 @@ def test_sham_hard_rule_holds_in_individual_mode():
 
 def test_hyperscanning_rejects_a_subject():
     with pytest.raises(ValueError):
-        BaselineSmoothingMapper(session_mode=SessionMode.HYPERSCANNING, subject="sub-01")
+        BaselineSmoothingMapper(
+            session_mode=SessionMode.HYPERSCANNING, subject="sub-01"
+        )
 
 
 def test_individual_requires_a_subject():

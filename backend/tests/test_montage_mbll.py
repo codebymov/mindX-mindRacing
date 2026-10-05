@@ -15,9 +15,9 @@ import pytest
 
 pytest.importorskip("mne")
 
-from mne.preprocessing.nirs import beer_lambert_law  # noqa: E402
+from mne.preprocessing.nirs import beer_lambert_law
 
-from mindx_hnf.preprocessing.montage import (  # noqa: E402
+from mindx_hnf.preprocessing.montage import (
     BeerLambertOperator,
     build_od_info,
     load_montage,

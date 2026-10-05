@@ -18,16 +18,16 @@ try:
 except (ImportError, RuntimeError) as exc:  # RuntimeError: liblsl binary missing
     pytest.skip(f"pylsl/liblsl unavailable: {exc}", allow_module_level=True)
 
-from pylsl import StreamInlet, resolve_byprop  # noqa: E402
+from pylsl import StreamInlet, resolve_byprop
 
-from mindx_hnf.api.sink import (  # noqa: E402
+from mindx_hnf.api.sink import (
     FEEDBACK_CHANNELS,
     MODE_CODE,
     SESSION_MODE_CODE,
     SHARED_SUBJECT_INDEX,
     LSLOutletSink,
 )
-from mindx_hnf.contracts import (  # noqa: E402
+from mindx_hnf.contracts import (
     FeedbackMode,
     FeedbackSample,
     SessionMode,

@@ -11,6 +11,10 @@ implementations:
                       can be validated against ground truth. No hardware needed.
 
 Both emit `RawFrame`s at a fixed update interval keyed to the LSL clock.
+
+Todo:
+    * Implement `LSLSource` (stream resolution, dejitter, chunk alignment) once
+      hardware is available (D10 Phase 3).
 """
 
 from __future__ import annotations
@@ -25,8 +29,14 @@ from mindx_hnf.contracts import RawFrame, SubjectId
 
 
 def lsl_clock() -> float:
-    """The single clock of record. Falls back to a monotonic clock if pylsl is
-    absent, so synthetic runs and tests don't require LSL installed."""
+    """Return the current time on the single clock of record.
+
+    Falls back to a monotonic clock if pylsl is absent, so synthetic runs and
+    tests don't require LSL installed.
+
+    Returns:
+        LSL ``local_clock()`` in seconds, or ``time.monotonic()`` without pylsl.
+    """
     try:
         from pylsl import local_clock
 
@@ -36,13 +46,25 @@ def lsl_clock() -> float:
 
 
 class FrameSource(Protocol):
+    """Source of time-synced raw frames consumed by the pipeline.
+
+    Attributes:
+        fs: Sampling rate in Hz.
+    """
+
     fs: float
 
     def frames(self) -> Iterator[RawFrame]:
-        """Yield time-synced RawFrames until the source is exhausted/stopped."""
+        """Iterate over the source's frames.
+
+        Yields:
+            Time-synced RawFrames until the source is exhausted or stopped.
+        """
         ...
 
-    def stop(self) -> None: ...
+    def stop(self) -> None:
+        """Ask the source to stop yielding frames."""
+        ...
 
 
 class SyntheticSource:
@@ -56,6 +78,16 @@ class SyntheticSource:
     This is the backbone of testing and CI: it lets us assert that INS *tracks
     true synchrony* and that the feedback loop closes within latency budget,
     with zero hardware.
+
+    Attributes:
+        montage: Montage whose wavelength-paired layout is emitted, if any.
+        n_channels: Raw channels per subject.
+        fs: Sampling rate in Hz.
+        chunk_samples: Samples per emitted frame.
+        subjects: The two subjects of the dyad.
+        coherence_fn: Ground-truth coherence in [0, 1] as a function of
+            elapsed seconds.
+        duration_s: Run length in seconds; None runs until ``stop``.
     """
 
     def __init__(
@@ -70,6 +102,22 @@ class SyntheticSource:
         duration_s: float | None = None,
         montage=None,
     ) -> None:
+        """Create the source.
+
+        Args:
+            n_channels: Raw channels per subject; overridden by the montage.
+            fs: Sampling rate in Hz (typical NIRSport2 rate by default).
+            chunk_samples: Samples per emitted frame.
+            subjects: The two subjects of the dyad.
+            coherence_fn: Ground-truth coherence vs elapsed seconds; constant
+                0.5 if None.
+            seed: RNG seed, for deterministic runs.
+            duration_s: Run length in seconds; None runs until ``stop``.
+            montage: Optional ``Montage``. With it the source emits
+                wavelength-paired intensities in the montage's channel order,
+                with per-subject systemic physiology in every channel and only
+                that in short channels (D10).
+        """
         # With a montage, emit wavelength-paired intensities in the montage's
         # channel order so the MNE Beer-Lambert MBLL path can run end-to-end on
         # synthetic data (D10). The signal model is unchanged; only the channel
@@ -100,11 +148,30 @@ class SyntheticSource:
         self._t0 = lsl_clock()
 
     def _latent(self, t: np.ndarray) -> np.ndarray:
+        """Return the shared latent hemodynamic signal at times ``t``.
+
+        Args:
+            t: Sample times in seconds.
+
+        Returns:
+            The latent signal, same shape as ``t``.
+        """
         # Shared slow hemodynamic oscillation around ~0.05 Hz.
         return np.sin(2 * np.pi * 0.05 * t) + 0.3 * np.sin(2 * np.pi * 0.09 * t)
 
     def _systemic(self, s: SubjectId, t: np.ndarray) -> np.ndarray:
-        """Slow AR(1) drift + respiration (~0.25 Hz) for one subject, (n,)."""
+        """Return one subject's systemic physiology at times ``t``.
+
+        Slow AR(1) drift plus respiration (~0.25 Hz); the AR state carries
+        over between chunks.
+
+        Args:
+            s: The subject.
+            t: Sample times in seconds.
+
+        Returns:
+            The systemic signal, shape ``(len(t),)``.
+        """
         a = np.exp(-1.0 / (10.0 * self.fs))  # ~10 s correlation time
         out = np.empty(t.shape[0])
         x = self._sys_state[s]
@@ -116,6 +183,12 @@ class SyntheticSource:
         return out + resp
 
     def frames(self) -> Iterator[RawFrame]:
+        """Generate frames, paced to roughly real time.
+
+        Yields:
+            One RawFrame of ``chunk_samples`` samples per subject, until
+            ``duration_s`` elapses or ``stop`` is called.
+        """
         dt_chunk = self.chunk_samples / self.fs
         sample_idx = 0
         while not self._stopped:
@@ -151,6 +224,7 @@ class SyntheticSource:
             time.sleep(max(0.0, dt_chunk))
 
     def stop(self) -> None:
+        """Stop yielding frames after the current one."""
         self._stopped = True
 
 
@@ -161,14 +235,32 @@ class LSLSource:
     resolution + dejitter + chunk-alignment logic is the first hardware task;
     `SyntheticSource` mirrors its output contract exactly so everything
     downstream can be built and tested before hardware arrives.
+
+    Attributes:
+        fnirs_stream_names: LSL fNIRS stream name per subject.
+        fs: Sampling rate in Hz.
     """
 
     def __init__(self, *, fnirs_stream_names: dict[SubjectId, str], fs: float) -> None:
+        """Store the stream configuration; nothing is resolved yet.
+
+        Args:
+            fnirs_stream_names: LSL fNIRS stream name per subject.
+            fs: Sampling rate in Hz.
+        """
         self.fnirs_stream_names = fnirs_stream_names
         self.fs = fs
         self._stopped = False
 
     def frames(self) -> Iterator[RawFrame]:  # pragma: no cover - needs hardware
+        """Iterate over live frames (not implemented yet).
+
+        Yields:
+            Time-synced RawFrames on the LSL clock, once implemented.
+
+        Raises:
+            NotImplementedError: Always, until hardware support is implemented.
+        """
         raise NotImplementedError(
             "LSLSource requires pylsl and live NIRSport2 streams. "
             "Develop and test against SyntheticSource; implement stream "
@@ -177,4 +269,5 @@ class LSLSource:
         )
 
     def stop(self) -> None:
+        """Ask the source to stop yielding frames."""
         self._stopped = True

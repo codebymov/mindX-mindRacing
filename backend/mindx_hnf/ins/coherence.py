@@ -14,6 +14,12 @@ Two estimators are provided:
 
 Both keep a per-subject ring buffer of channel-averaged HbO and recompute on a
 fixed update cadence (`update_every_s`).
+
+Todo:
+    * Replace the Welch coherence in `WaveletCoherenceINS` with a true Morlet
+      continuous wavelet coherence averaged over scales in `band`, keeping the
+      protocol and the [0, 1] output; validate against SyntheticSource ground
+      truth (O4).
 """
 
 from __future__ import annotations
@@ -27,12 +33,22 @@ class _RingBuffer:
     """Fixed-capacity 1-D ring buffer (no per-sample allocation in steady state)."""
 
     def __init__(self, capacity: int) -> None:
+        """Pre-allocate the buffer.
+
+        Args:
+            capacity: Number of samples retained.
+        """
         self._buf = np.zeros(capacity, dtype=float)
         self._cap = capacity
         self._n = 0
         self._head = 0
 
     def push(self, x: np.ndarray) -> None:
+        """Append samples, overwriting the oldest once full.
+
+        Args:
+            x: 1-D array of new samples, oldest first.
+        """
         for v in x:
             self._buf[self._head] = v
             self._head = (self._head + 1) % self._cap
@@ -40,15 +56,33 @@ class _RingBuffer:
 
     @property
     def filled(self) -> bool:
+        """Whether the buffer holds ``capacity`` samples."""
         return self._n >= self._cap
 
     def view(self) -> np.ndarray:
+        """Return the buffered samples in chronological order.
+
+        Returns:
+            A copy of the stored samples, oldest first.
+        """
         if self._n < self._cap:
             return self._buf[: self._n].copy()
         return np.concatenate((self._buf[self._head :], self._buf[: self._head]))
 
 
 class _BaseSlidingINS:
+    """Sliding-window INS estimator skeleton (implements INSEstimator).
+
+    Subclasses implement ``_compute`` on the two windowed, channel-averaged HbO
+    series; this base handles buffering and the update cadence.
+
+    Attributes:
+        name: Estimator name stamped into ``INSSample.estimator``.
+        subjects: The two subjects of the dyad.
+        fs: Sampling rate in Hz.
+        window_n: Window length in samples.
+    """
+
     name = "base"
 
     def __init__(
@@ -58,14 +92,27 @@ class _BaseSlidingINS:
         window_s: float = 30.0,
         update_every_s: float = 1.0,
     ) -> None:
+        """Create an estimator with empty windows.
+
+        Args:
+            subjects: The two subjects of the dyad.
+            fs: Sampling rate in Hz.
+            window_s: Window length in seconds (latency vs. stability, O3).
+            update_every_s: Minimum interval between emitted values.
+        """
         self.subjects = subjects
         self.fs = fs
-        self.window_n = int(round(window_s * fs))
-        self._update_n = max(1, int(round(update_every_s * fs)))
+        self.window_n = round(window_s * fs)
+        self._update_n = max(1, round(update_every_s * fs))
         self._since_update = 0
         self._buf = {s: _RingBuffer(self.window_n) for s in subjects}
 
     def _ingest(self, frame: HemoFrame) -> None:
+        """Push each subject's channel-averaged HbO into its window.
+
+        Args:
+            frame: Preprocessed hemodynamics of both subjects.
+        """
         for s in self.subjects:
             # channel-averaged HbO over target channels (montage selects PFC/rTPJ
             # upstream; here we average all provided channels).
@@ -74,6 +121,11 @@ class _BaseSlidingINS:
             self._since_update += chan_mean.shape[0]
 
     def _ready(self) -> bool:
+        """Whether both windows are full and an update is due.
+
+        Returns:
+            True if a new value should be computed now.
+        """
         a, b = self.subjects
         return (
             self._buf[a].filled
@@ -82,9 +134,29 @@ class _BaseSlidingINS:
         )
 
     def _compute(self, x: np.ndarray, y: np.ndarray) -> float:  # pragma: no cover
+        """Compute the raw synchrony of two equal-length windows.
+
+        Args:
+            x: First subject's windowed series.
+            y: Second subject's windowed series.
+
+        Returns:
+            The synchrony value; clipped to [0, 1] by the caller.
+
+        Raises:
+            NotImplementedError: Always; subclasses must override.
+        """
         raise NotImplementedError
 
     def update(self, frame: HemoFrame) -> INSSample | None:
+        """Push a frame and return a new INS value when one is ready.
+
+        Args:
+            frame: Preprocessed hemodynamics of both subjects.
+
+        Returns:
+            The new INS sample in [0, 1], or None if no update is due yet.
+        """
         self._ingest(frame)
         if not self._ready():
             return None
@@ -97,6 +169,7 @@ class _BaseSlidingINS:
         return INSSample(t_lsl=frame.t_lsl, value=value, estimator=self.name)
 
     def reset(self) -> None:
+        """Clear both windows and the update counter."""
         self._buf = {s: _RingBuffer(self.window_n) for s in self.subjects}
         self._since_update = 0
 
@@ -107,6 +180,15 @@ class WindowedCorrelationINS(_BaseSlidingINS):
     name = "windowed_correlation"
 
     def _compute(self, x: np.ndarray, y: np.ndarray) -> float:
+        """Pearson correlation of the windows, negative values set to 0.
+
+        Args:
+            x: First subject's windowed series.
+            y: Second subject's windowed series.
+
+        Returns:
+            max(0, r), or 0 if either window is flat.
+        """
         if np.std(x) < 1e-9 or np.std(y) < 1e-9:
             return 0.0
         r = float(np.corrcoef(x, y)[0, 1])
@@ -116,19 +198,40 @@ class WindowedCorrelationINS(_BaseSlidingINS):
 class WaveletCoherenceINS(_BaseSlidingINS):
     """Windowed magnitude-squared coherence in the hemodynamic band.
 
-    Implemented here as Welch-averaged coherence (band-limited). TODO for
-    Claude Code: replace the Welch coherence with a true Morlet continuous
+    Implemented here as Welch-averaged coherence (band-limited).
+    TODO(claude-code): replace the Welch coherence with a true Morlet continuous
     wavelet coherence averaged over scales in `band`, keeping this same protocol
     and the [0,1] output. Validate against SyntheticSource ground truth.
+
+    Attributes:
+        band: Frequency band in Hz over which coherence is averaged.
     """
 
     name = "wavelet_coherence"
 
-    def __init__(self, *args, band: tuple[float, float] = (0.01, 0.1), **kwargs) -> None:
+    def __init__(
+        self, *args, band: tuple[float, float] = (0.01, 0.1), **kwargs
+    ) -> None:
+        """Create the estimator.
+
+        Args:
+            *args: Positional arguments of ``_BaseSlidingINS``.
+            band: Frequency band in Hz over which coherence is averaged.
+            **kwargs: Keyword arguments of ``_BaseSlidingINS``.
+        """
         super().__init__(*args, **kwargs)
         self.band = band
 
     def _compute(self, x: np.ndarray, y: np.ndarray) -> float:
+        """Welch magnitude-squared coherence averaged over ``band``.
+
+        Args:
+            x: First subject's windowed series.
+            y: Second subject's windowed series.
+
+        Returns:
+            Mean in-band coherence, or 0 if the window is too short.
+        """
         n = x.shape[0]
         if n < 16:
             return 0.0

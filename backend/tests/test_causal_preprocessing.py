@@ -19,16 +19,16 @@ import pytest
 
 pytest.importorskip("mne")
 
-import mne  # noqa: E402
-from scipy.signal import detrend  # noqa: E402
+import mne
+from scipy.signal import detrend
 
-from mindx_hnf.preprocessing.causal import (  # noqa: E402
+from mindx_hnf.preprocessing.causal import (
     CausalODReference,
     CausalShortChannelRegression,
     CausalTDDR,
     short_channel_partners,
 )
-from mindx_hnf.preprocessing.montage import build_od_info, load_montage  # noqa: E402
+from mindx_hnf.preprocessing.montage import build_od_info, load_montage
 
 _MONTAGE = Path(__file__).resolve().parents[1] / "configs" / "montage_demo.yaml"
 FS = 7.81
@@ -243,7 +243,6 @@ def test_scr_is_causal():
 # --------------------------------------------------------------------------- #
 def test_orchestrator_locks_od_reference_after_baseline():
     from mindx_hnf.contracts import FeedbackMode
-
     from mindx_hnf.scripts.simulate import build_demo
 
     orch, sink = build_demo(mode=FeedbackMode.REAL, fast=True, montage=_MONTAGE)
@@ -256,8 +255,8 @@ def test_orchestrator_locks_od_reference_after_baseline():
 
 def _ins_tracking(monkeypatch, seed: int, **pipeline_kw) -> float:
     """corr(INS, ground-truth coherence) on the montage path, run faster than real time."""
-    import mindx_hnf.io.sources as sources
     from mindx_hnf.ins.coherence import WaveletCoherenceINS
+    from mindx_hnf.io import sources
     from mindx_hnf.preprocessing.online import OnlineHemoPipeline
 
     clock = [0.0]
@@ -293,7 +292,7 @@ def _ins_tracking(monkeypatch, seed: int, **pipeline_kw) -> float:
         out = ins.update(pipe.process(frame))
         if out is not None:
             est.append(out.value)
-            ref.append(truth(frame.t_lsl - src._t0))  # noqa: SLF001
+            ref.append(truth(frame.t_lsl - src._t0))
     return float(np.corrcoef(est[60:], ref[60:])[0, 1])
 
 

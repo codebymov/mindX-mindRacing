@@ -1,4 +1,8 @@
-"""Feedback mapping and sham provider."""
+"""Feedback mapping and sham provider.
+
+``BaselineSmoothingMapper`` turns raw INS into the delivered feedback level;
+``ShamProvider`` supplies the replayed other-dyad signal for sham sessions (D5).
+"""
 
 from __future__ import annotations
 
@@ -25,12 +29,26 @@ class ShamProvider:
     """
 
     def __init__(self, recorded_values: list[float]) -> None:
+        """Create a provider that replays a recorded INS trace.
+
+        Args:
+            recorded_values: Another dyad's INS trace for the same
+                session/task, in delivery order.
+
+        Raises:
+            ValueError: If ``recorded_values`` is empty.
+        """
         if not recorded_values:
             raise ValueError("Sham provider requires a non-empty recorded trace.")
         self._values = recorded_values
         self._it: Iterator[float] = iter(self._values)
 
     def next_value(self) -> float:
+        """Return the next recorded value, looping the trace when exhausted.
+
+        Returns:
+            The next INS value of the replayed trace.
+        """
         try:
             return next(self._it)
         except StopIteration:
@@ -39,6 +57,7 @@ class ShamProvider:
             return next(self._it)
 
     def reset(self) -> None:
+        """Restart replay from the beginning of the trace."""
         self._it = iter(self._values)
 
 
@@ -59,6 +78,13 @@ class BaselineSmoothingMapper:
     constructed with that subject's id, so the per-subject cars stay independent.
     The mapping math is unchanged either way — `session_mode`/`subject` are only
     stamped onto the output for routing and provenance.
+
+    Attributes:
+        sham: Source of the replayed signal in sham mode, if any.
+        smoothing: Exponential-smoothing weight of the newest value, in (0, 1].
+        gain: Multiplier applied to the baseline-corrected value.
+        session_mode: Paradigm stamped onto every output sample (D8).
+        subject: Owning subject in Individual mode, None in Hyperscanning.
     """
 
     def __init__(
@@ -71,6 +97,22 @@ class BaselineSmoothingMapper:
         session_mode: SessionMode = SessionMode.HYPERSCANNING,
         subject: SubjectId | None = None,
     ) -> None:
+        """Create a mapper for one session mode (and one subject if Individual).
+
+        Args:
+            sham: Replayed other-dyad signal; required to map in sham mode.
+            smoothing: Exponential-smoothing weight of the newest value.
+            gain: Multiplier applied to the baseline-corrected value.
+            baseline_window: Number of resting-block INS values averaged into
+                the baseline.
+            session_mode: Paradigm this mapper serves (D8).
+            subject: The car owner in Individual mode; must be None in
+                Hyperscanning.
+
+        Raises:
+            ValueError: If ``subject`` is set in Hyperscanning mode or missing
+                in Individual mode.
+        """
         if session_mode is SessionMode.HYPERSCANNING and subject is not None:
             raise ValueError(
                 "Hyperscanning mode drives one shared car; subject must be None."
@@ -96,11 +138,32 @@ class BaselineSmoothingMapper:
         self._baseline_locked = True
 
     def observe_baseline(self, ins: INSSample) -> None:
-        """Feed resting-block INS values to establish the baseline."""
+        """Feed a resting-block INS value to establish the baseline.
+
+        Ignored once the baseline is locked.
+
+        Args:
+            ins: An INS sample observed during the baseline block.
+        """
         if not self._baseline_locked:
             self._baseline.append(ins.value)
 
     def map(self, ins: INSSample, mode: FeedbackMode) -> FeedbackSample:
+        """Baseline-correct, scale, smooth and clamp one INS value.
+
+        In sham mode the raw value is replaced by the sham provider's value
+        before mapping, so the mapping itself is identical across modes.
+
+        Args:
+            ins: The real dyad's INS sample (its timestamp is kept in sham).
+            mode: Real or sham.
+
+        Returns:
+            The feedback sample with ``level`` in [0, 1].
+
+        Raises:
+            RuntimeError: If sham mode is requested without a ``ShamProvider``.
+        """
         if mode is FeedbackMode.SHAM:
             if self.sham is None:
                 raise RuntimeError("Sham mode requested but no ShamProvider set.")
@@ -124,6 +187,7 @@ class BaselineSmoothingMapper:
         )
 
     def reset(self) -> None:
+        """Clear baseline, smoothing and sham-replay state."""
         self._baseline.clear()
         self._smoothed = 0.0
         self._baseline_locked = False

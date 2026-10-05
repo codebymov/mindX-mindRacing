@@ -47,6 +47,11 @@ class CausalODReference:
     """
 
     def __init__(self, n_channels: int) -> None:
+        """Create an unlocked reference.
+
+        Args:
+            n_channels: Raw intensity channels.
+        """
         self._sum = np.zeros((n_channels, 1))
         self._count = 0
         self._ref = np.ones((n_channels, 1))
@@ -54,16 +59,27 @@ class CausalODReference:
 
     @property
     def locked(self) -> bool:
+        """Whether the reference is frozen."""
         return self._locked
 
     @property
     def reference(self) -> np.ndarray:
+        """Current reference intensity ``I_ref``, shape ``(n_channels, 1)``."""
         return self._ref
 
     def lock(self) -> None:
+        """Freeze the reference (call at the end of the baseline block)."""
         self._locked = True
 
     def __call__(self, intensity: np.ndarray) -> np.ndarray:
+        """Convert one chunk to optical density, updating the reference if unlocked.
+
+        Args:
+            intensity: Raw intensity, shape ``(n_channels, n_samples)``.
+
+        Returns:
+            ``-ln(I / I_ref)``, same shape as ``intensity``.
+        """
         if not self._locked or self._count == 0:
             self._sum += intensity.sum(axis=1, keepdims=True)
             self._count += intensity.shape[1]
@@ -71,6 +87,7 @@ class CausalODReference:
         return -np.log(np.clip(intensity, _EPS, None) / np.clip(self._ref, _EPS, None))
 
     def reset(self) -> None:
+        """Forget all data and unlock the reference."""
         self._sum[:] = 0.0
         self._count = 0
         self._ref[:] = 1.0
@@ -109,14 +126,25 @@ class CausalTDDR:
         filter_cutoff: float = 0.5,
         filter_order: int = 3,
     ) -> None:
+        """Pre-allocate filter state and the derivative window.
+
+        Args:
+            n_channels: Channels corrected in parallel.
+            fs: Sampling rate in Hz.
+            window_s: Length of the robust-statistics window in seconds.
+            min_window_s: Warm-up before correction starts; the step is an
+                identity until this much derivative history exists.
+            filter_cutoff: Low/high split frequency in Hz (as in MNE).
+            filter_order: Butterworth order of the split (as in MNE).
+        """
         wn = filter_cutoff * 2.0 / fs
         self._sos = butter(filter_order, wn, output="sos") if wn < 1.0 else None
         self._zi_unit: np.ndarray | None = (
             sosfilt_zi(self._sos) if self._sos is not None else None
         )
         self._zi: np.ndarray | None = None
-        self._capacity = max(2, int(round(window_s * fs)))
-        self._min_fill = max(2, int(round(min_window_s * fs)))
+        self._capacity = max(2, round(window_s * fs))
+        self._min_fill = max(2, round(min_window_s * fs))
         self._deriv = np.zeros((n_channels, self._capacity))
         self._pos = 0
         self._filled = 0
@@ -125,7 +153,14 @@ class CausalTDDR:
         self._started = False
 
     def _split(self, x: np.ndarray) -> np.ndarray:
-        """Causal low band of ``x``; state is retained across chunks."""
+        """Return the causal low band of ``x``; state is retained across chunks.
+
+        Args:
+            x: Input chunk, shape ``(n_channels, n_samples)``.
+
+        Returns:
+            The low-band part of ``x``, same shape.
+        """
         if self._sos is None or self._zi_unit is None:
             return x.copy()
         if self._zi is None:
@@ -135,6 +170,11 @@ class CausalTDDR:
         return low
 
     def _push(self, d: np.ndarray) -> None:
+        """Append derivatives to the ring-buffer window.
+
+        Args:
+            d: Derivatives, shape ``(n_channels, n_samples)``.
+        """
         n = d.shape[1]
         if n >= self._capacity:
             self._deriv[:] = d[:, -self._capacity :]
@@ -151,7 +191,14 @@ class CausalTDDR:
         self._filled = min(self._capacity, self._filled + n)
 
     def _robust_stats(self) -> tuple[np.ndarray, np.ndarray]:
-        """Per-channel (mu, sigma) by MNE's iterated biweight, vectorized over channels."""
+        """Estimate per-channel robust derivative statistics over the window.
+
+        Uses MNE's iterated Tukey biweight, vectorized over channels.
+
+        Returns:
+            ``(mu, sigma)``, each of shape ``(n_channels,)``. ``sigma == 0``
+            marks a channel whose derivatives are left unweighted.
+        """
         d = self._deriv[:, : self._filled]
         n_ch = d.shape[0]
         w = np.ones_like(d)
@@ -180,6 +227,15 @@ class CausalTDDR:
         return mu, sigma
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
+        """Motion-correct one chunk.
+
+        Args:
+            x: Optical density (or concentration), shape
+                ``(n_channels, n_samples)``.
+
+        Returns:
+            The corrected chunk, same shape as ``x``.
+        """
         low = self._split(x)
         high = x - low
         if not self._started:
@@ -205,6 +261,7 @@ class CausalTDDR:
         return low_corrected + high
 
     def reset(self) -> None:
+        """Clear filter state, the derivative window and the integrator."""
         self._zi = None
         self._deriv[:] = 0.0
         self._pos = 0
@@ -215,16 +272,28 @@ class CausalTDDR:
 
 
 def short_channel_partners(montage: Montage, max_dist: float = 0.01) -> np.ndarray:
-    """For each raw OD row, the raw row of its regressor short channel (or -1).
+    """Map each raw OD row to the raw row of its regressor short channel.
 
     A long channel's partner is the nearest short channel (by midpoint distance,
     MNE-NIRS's criterion) **at the same wavelength**. MNE-NIRS 0.7.3 picks the
     first short row at the nearest midpoint, which regresses BOTH wavelengths of
     a long channel on the short channel's first (760 nm) row; pairing by
     wavelength is the physically correct version (Scholkmann 2014 regresses per
-    wavelength). Short rows and channels > ``max_dist`` from no short get -1.
-    Shortness follows the montage's ``short`` flag; ``max_dist`` is only a
-    consistency check against the geometry.
+    wavelength). Short rows get -1, as does every row of a montage without
+    short channels. Shortness follows the montage's ``short`` flag;
+    ``max_dist`` is only a consistency check against the geometry.
+
+    Args:
+        montage: The montage, in raw-layout order.
+        max_dist: Maximum source-detector distance in metres for a short
+            channel.
+
+    Returns:
+        Integer array of length ``montage.n_raw_channels``: the partner's raw
+        row index, or -1.
+
+    Raises:
+        ValueError: If a channel flagged short is at least ``max_dist`` long.
     """
     n_wl = len(montage.wavelengths)
     mids = np.array(
@@ -264,11 +333,22 @@ class CausalShortChannelRegression:
     optical density (the causal OD reference is not the whole-recording mean)
     does not bias ``alpha``; on zero-mean data with ``tau_s=None`` the final
     ``alpha`` is exactly MNE-NIRS's. Short rows pass through unchanged.
+
+    Attributes:
+        alpha: Current regression coefficient per long row.
     """
 
     def __init__(
         self, partners: np.ndarray, fs: float, tau_s: float | None = 120.0
     ) -> None:
+        """Create the regressor with zero running moments.
+
+        Args:
+            partners: Output of ``short_channel_partners``; rows with -1 are
+                left unchanged.
+            fs: Sampling rate in Hz.
+            tau_s: Forgetting time constant in seconds; None = no forgetting.
+        """
         self._long = np.flatnonzero(partners >= 0)
         self._short = partners[self._long]
         self._lam = 1.0 if tau_s is None else float(np.exp(-1.0 / (tau_s * fs)))
@@ -282,9 +362,18 @@ class CausalShortChannelRegression:
 
     @property
     def enabled(self) -> bool:
+        """Whether any row has a short-channel partner."""
         return self._long.size > 0
 
     def __call__(self, od: np.ndarray) -> np.ndarray:
+        """Regress the short-channel signal out of each long row, sample by sample.
+
+        Args:
+            od: Optical density, shape ``(n_raw_channels, n_samples)``.
+
+        Returns:
+            Corrected optical density, same shape; ``od`` itself if disabled.
+        """
         if not self.enabled:
             return od
         out = od.copy()
@@ -305,6 +394,7 @@ class CausalShortChannelRegression:
         return out
 
     def reset(self) -> None:
+        """Clear the running moments and coefficients."""
         self._w = 0.0
         self._ms[:] = 0.0
         self._ml[:] = 0.0

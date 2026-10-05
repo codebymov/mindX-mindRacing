@@ -4,6 +4,10 @@ Chains the causal stages: OD with a baseline-frozen reference, streaming TDDR,
 and wavelength-paired short-channel regression (preprocessing/causal.py), then
 MNE's Beer-Lambert operator (preprocessing/montage.py) and a causal bandpass.
 Each MNE-derived stage is tested against MNE's batch version as the oracle.
+
+Todo:
+    * Replace `_CausalBandpass` with a properly designed causal Butterworth
+      (``scipy.signal`` SOS filter with retained state).
 """
 
 from __future__ import annotations
@@ -21,15 +25,28 @@ from mindx_hnf.preprocessing.montage import BeerLambertOperator, Montage
 
 
 class _CausalBandpass:
-    """Single-section causal IIR-style bandpass via a streaming difference of
-    two first-order leaky integrators (low - lower). Cheap, causal, stateful.
+    """Causal placeholder bandpass: difference of two leaky integrators.
 
-    Replace with a properly designed causal Butterworth (scipy.signal.lfilter
+    Single-section causal IIR-style bandpass via a streaming difference of two
+    first-order leaky integrators (low - lower). Cheap, causal, stateful.
+
+    TODO(claude-code): replace with a properly designed causal Butterworth (scipy.signal.lfilter
     with retained `zi` state) — this placeholder keeps the streaming-state
     pattern explicit. The state lives per channel.
+
+    Attributes:
+        fs: Sampling rate in Hz.
     """
 
     def __init__(self, n_channels: int, fs: float, low: float, high: float) -> None:
+        """Create the filter with zero state.
+
+        Args:
+            n_channels: Number of channels filtered in parallel.
+            fs: Sampling rate in Hz.
+            low: Lower cutoff in Hz.
+            high: Upper cutoff in Hz.
+        """
         self.fs = fs
         # leak coefficients from cutoff approximations
         self._a_low = np.exp(-2 * np.pi * high / fs)
@@ -38,6 +55,14 @@ class _CausalBandpass:
         self._y_high = np.zeros((n_channels, 1))
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
+        """Filter one chunk, carrying state across calls.
+
+        Args:
+            x: Input of shape ``(n_channels, n_samples)``.
+
+        Returns:
+            The filtered chunk, same shape as ``x``.
+        """
         out = np.empty_like(x)
         for i in range(x.shape[1]):
             xi = x[:, i : i + 1]
@@ -47,6 +72,7 @@ class _CausalBandpass:
         return out
 
     def reset(self) -> None:
+        """Zero the filter state."""
         self._y_low[:] = 0.0
         self._y_high[:] = 0.0
 
@@ -74,6 +100,12 @@ class OnlineHemoPipeline:
 
     The OD reference is the running mean intensity until :meth:`lock_baseline`
     (called by the orchestrator when the baseline block ends), then frozen.
+
+    Attributes:
+        subjects: Subjects processed per frame.
+        fs: Sampling rate in Hz.
+        band: Bandpass edges in Hz.
+        montage: Optode montage, or None for the placeholder path.
     """
 
     def __init__(
@@ -88,6 +120,27 @@ class OnlineHemoPipeline:
         tddr_window_s: float = 60.0,
         scr_tau_s: float | None = 120.0,
     ) -> None:
+        """Build per-subject stage state (and the MNE operator, once).
+
+        Args:
+            subjects: Subjects processed per frame.
+            n_channels: Raw channels per subject; ignored with a montage, which
+                fixes it to ``montage.n_raw_channels``.
+            fs: Sampling rate in Hz.
+            band: Bandpass edges in Hz.
+            montage: Optode montage; enables MNE MBLL and short-channel
+                regression.
+            motion_correction: Run causal TDDR.
+            short_channel_regression: Run short-channel regression (needs a
+                montage with short channels).
+            tddr_window_s: TDDR robust-statistics window in seconds.
+            scr_tau_s: Short-channel regression forgetting time constant in
+                seconds; None = no forgetting.
+
+        Raises:
+            ValueError: If the montage does not have exactly two wavelengths, or
+                a channel flagged short is not geometrically short.
+        """
         self.subjects = subjects
         self.fs = fs
         self.band = band
@@ -120,6 +173,7 @@ class OnlineHemoPipeline:
 
     @property
     def baseline_locked(self) -> bool:
+        """Whether every subject's OD reference is frozen."""
         return all(self._od[s].locked for s in self.subjects)
 
     def lock_baseline(self) -> None:
@@ -128,6 +182,15 @@ class OnlineHemoPipeline:
             self._od[s].lock()
 
     def process(self, frame: RawFrame) -> HemoFrame:
+        """Run the causal chain on one frame for every subject.
+
+        Args:
+            frame: Raw intensities; with a montage, wavelength-paired in the
+                montage's channel order.
+
+        Returns:
+            Bandpassed Δ[HbO]/[HbR] in µM, long channels only with a montage.
+        """
         hbo: dict[SubjectId, np.ndarray] = {}
         hbr: dict[SubjectId, np.ndarray] = {}
         for s in self.subjects:
@@ -151,6 +214,7 @@ class OnlineHemoPipeline:
         return HemoFrame(t_lsl=frame.t_lsl, hbo=hbo, hbr=hbr, fs=self.fs)
 
     def reset(self) -> None:
+        """Reset every stage and unlock the OD reference."""
         for s in self.subjects:
             self._od[s].reset()
             if self._tddr is not None:

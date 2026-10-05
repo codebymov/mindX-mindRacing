@@ -101,7 +101,35 @@ family across acquisition + preprocessing.
   `SyntheticSource(montage=...)`. Tests (`tests/test_montage_mbll.py`) pin the
   operator == MNE batch to <1e-9 µM, causality, and an end-to-end synthetic run.
   `mne`+`scipy` are now core deps. The montage-free path is unchanged.
-- **Phase 2 (next):** causal TDDR (windowed) + short-channel regression (the
-  montage already flags the short channel), each vs the MNE batch oracle. Also:
-  freeze the OD reference at baseline-block lock (currently a causal EMA).
+- **Phase 2 — DONE (2026-10-05).** `preprocessing/causal.py`, chained in
+  `OnlineHemoPipeline` in MNE-NIRS order: OD -> TDDR -> short-channel regression
+  -> MBLL -> (drop short channels) -> causal bandpass. Tests:
+  `tests/test_causal_preprocessing.py`.
+  - **OD reference** = running mean until `lock_baseline()`, then frozen. The
+    orchestrator locks every `BaselineLockable` preprocessor on the first frame
+    after the baseline block. Oracle: equals MNE `optical_density` on the
+    baseline segment to 1e-12.
+  - **Causal TDDR**: MNE's iterated Tukey-biweight algorithm, but robust
+    (mu, sigma) over a 60 s sliding window of past derivatives (re-estimated per
+    chunk) and a causal SOS Butterworth low/high split instead of `filtfilt`.
+    Identity during a 10 s warm-up. Measured vs MNE batch TDDR on 300 s with
+    step + spike artifacts: detrended RMS error 0.0175 (causal) vs 0.0137 (MNE)
+    vs 0.039 uncorrected; tests require < 0.6x uncorrected and < 1.6x MNE.
+    ~1 ms per subject per frame.
+  - **Short-channel regression**: Scholkmann eqn 26/27 with alpha from
+    exponentially weighted, mean-centred running moments (tau 120 s). With no
+    forgetting on zero-mean data the final alpha/output equal MNE-NIRS to 1e-10.
+    **MNE-NIRS 0.7.3 quirk found:** its nearest-short search compares
+    midpoints, which both wavelengths of a short pair share, so it regresses
+    BOTH wavelengths of every long channel on the 760 nm short row (850 nm long
+    channels get effectively no correction). Online we pair **by wavelength**;
+    the oracle test checks 850 nm against MNE-NIRS run on the 850 nm rows alone.
+  - Output is **long channels only** (`montage.n_long`): short channels are
+    regressors and must not dilute the channel-averaged INS.
+  - Synthetic montage source now adds per-subject systemic physiology to every
+    channel, with short channels carrying only that. On it, corr(INS, true
+    coherence) is ~0.55 with short-channel regression vs ~0.19 without (pinned
+    by a test). TDDR costs ~0.03 of that correlation on artifact-free data —
+    the price of robustness; revisit with pilot data (O3/O4).
+  - `simulate --montage configs/montage_demo.yaml` runs the full MNE path.
 - **Phase 3:** MNE `LSLClient` option for `io/LSLSource` when hardware arrives.

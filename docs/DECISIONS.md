@@ -84,6 +84,12 @@ move it to "Decided" with the date and rationale, in the same commit as the code
   first-class config; the synthetic source must emit wavelength-paired intensities.
   Full plan + verified findings: `docs/MNE_ONLINE_SCOPE.md`. Supersedes the
   earlier "MNE = offline analysis only" framing.
+  **Phase 2 (2026-10-05):** causal TDDR, short-channel regression and the
+  baseline-frozen OD reference are online (`preprocessing/causal.py`), each
+  oracle-tested against MNE / MNE-NIRS. Two deliberate departures from MNE-NIRS:
+  short-channel regression pairs **by wavelength** (MNE-NIRS 0.7.3 regresses
+  both wavelengths on the 760 nm short row), and the pipeline outputs **long
+  channels only** so short (nuisance) channels never reach the INS estimator.
 
 - **D12 — O5 netcode = Ubiq, self-hosted on the lab LAN (2026-07-07).** Resolves
   the O5 netcode sub-decision. Ubiq (UCL, Apache-2.0) is self-hostable with no

@@ -1,11 +1,9 @@
 """Causal streaming preprocessing pipeline.
 
-This is a *working but deliberately minimal* online pipeline. It establishes the
-contract and the causal-filter discipline; the real fNIRS-grade conversions
-(MBLL with measured pathlengths, full TDDR, principled short-channel GLM
-regression) are flagged with TODOs and validated in tests against the synthetic
-source. The point of the scaffold is that the *seams and invariants* are right
-so Claude Code can fill in the numerics without redesigning the architecture.
+Chains the causal stages: OD with a baseline-frozen reference, streaming TDDR,
+and wavelength-paired short-channel regression (preprocessing/causal.py), then
+MNE's Beer-Lambert operator (preprocessing/montage.py) and a causal bandpass.
+Each MNE-derived stage is tested against MNE's batch version as the oracle.
 """
 
 from __future__ import annotations
@@ -13,6 +11,12 @@ from __future__ import annotations
 import numpy as np
 
 from mindx_hnf.contracts import HemoFrame, RawFrame, SubjectId
+from mindx_hnf.preprocessing.causal import (
+    CausalODReference,
+    CausalShortChannelRegression,
+    CausalTDDR,
+    short_channel_partners,
+)
 from mindx_hnf.preprocessing.montage import BeerLambertOperator, Montage
 
 
@@ -48,19 +52,28 @@ class _CausalBandpass:
 
 
 class OnlineHemoPipeline:
-    """Implements the OnlinePreprocessor protocol.
+    """Implements the OnlinePreprocessor (and BaselineLockable) protocols.
 
-    Per subject it keeps: a running DC reference for optical-density conversion
-    and a causal bandpass with retained state. Converts intensity -> OD ->
-    concentration and bandpasses in the hemodynamic band.
+    Per subject, per frame, all causal (D10 Phase 2 — the MNE-NIRS order):
 
-    MBLL (D10): if a ``montage`` is given, HbO/HbR come from the MNE-NIRS
-    Beer-Lambert operator (validated extinction coefficients + PPF), applied
-    causally per frame as a numpy matmul — the operator is built ONCE from MNE at
-    construction (see preprocessing/montage.py) and never touched on the hot path.
-    Raw intensity must then be wavelength-paired in the montage's channel order
-    (``montage.n_raw_channels`` rows). Without a montage the pipeline falls back
-    to the earlier placeholder mapping so the montage-free path keeps working.
+        intensity -> optical density (baseline-frozen reference)
+                  -> TDDR motion correction (streaming)
+                  -> short-channel regression (wavelength-paired, streaming)
+                  -> MBLL -> Δ[HbO]/[HbR]
+                  -> drop short channels -> causal bandpass
+
+    MBLL: with a ``montage``, HbO/HbR come from the MNE-NIRS Beer-Lambert
+    operator, built ONCE at construction (preprocessing/montage.py) and applied
+    as a numpy matmul. Raw intensity must then be wavelength-paired in the
+    montage's channel order (``montage.n_raw_channels`` rows). The output holds
+    the montage's LONG channels only (``montage.n_long``): short channels are
+    nuisance regressors, not brain signal, and must not reach the INS estimator.
+    Without a montage the pipeline falls back to the placeholder mapping and has
+    no short-channel regression (no geometry), so the montage-free path keeps
+    working.
+
+    The OD reference is the running mean intensity until :meth:`lock_baseline`
+    (called by the orchestrator when the baseline block ends), then frozen.
     """
 
     def __init__(
@@ -70,30 +83,59 @@ class OnlineHemoPipeline:
         fs: float,
         band: tuple[float, float] = (0.01, 0.1),
         montage: Montage | None = None,
+        motion_correction: bool = True,
+        short_channel_regression: bool = True,
+        tddr_window_s: float = 60.0,
+        scr_tau_s: float | None = 120.0,
     ) -> None:
         self.subjects = subjects
         self.fs = fs
         self.band = band
         self.montage = montage
         self._op = BeerLambertOperator.from_montage(montage) if montage else None
-        # Bandpass runs on the concentration channels: n_pairs with a montage,
-        # else the raw channel count.
-        out_channels = montage.n_pairs if montage else n_channels
-        self._dc: dict[SubjectId, np.ndarray | None] = {s: None for s in subjects}
+        raw_channels = montage.n_raw_channels if montage else n_channels
+        if montage is not None:
+            self._keep: np.ndarray | None = ~montage.short_mask
+            out_channels = montage.n_long
+            partners = short_channel_partners(montage)
+        else:
+            self._keep = None
+            out_channels = n_channels
+            partners = np.full(raw_channels, -1, dtype=int)
+        if not short_channel_regression:
+            partners = np.full(raw_channels, -1, dtype=int)
+
+        self._od = {s: CausalODReference(raw_channels) for s in subjects}
+        self._tddr = (
+            {s: CausalTDDR(raw_channels, fs, window_s=tddr_window_s) for s in subjects}
+            if motion_correction
+            else None
+        )
+        self._scr = {
+            s: CausalShortChannelRegression(partners, fs, tau_s=scr_tau_s)
+            for s in subjects
+        }
         self._bp_hbo = {s: _CausalBandpass(out_channels, fs, *band) for s in subjects}
         self._bp_hbr = {s: _CausalBandpass(out_channels, fs, *band) for s in subjects}
+
+    @property
+    def baseline_locked(self) -> bool:
+        return all(self._od[s].locked for s in self.subjects)
+
+    def lock_baseline(self) -> None:
+        """Freeze every subject's OD reference at the baseline-block mean."""
+        for s in self.subjects:
+            self._od[s].lock()
 
     def process(self, frame: RawFrame) -> HemoFrame:
         hbo: dict[SubjectId, np.ndarray] = {}
         hbr: dict[SubjectId, np.ndarray] = {}
         for s in self.subjects:
             intensity = np.asarray(frame.fnirs[s], dtype=float)
-            # --- intensity -> optical density (causal running DC reference) ---
-            dc = self._dc[s]
-            chunk_dc = intensity.mean(axis=1, keepdims=True)
-            dc = chunk_dc if dc is None else 0.99 * dc + 0.01 * chunk_dc
-            self._dc[s] = dc
-            od = -np.log(np.clip(intensity, 1e-6, None) / np.clip(dc, 1e-6, None))
+            od = self._od[s](intensity)
+            if self._tddr is not None:
+                od = self._tddr[s](od)
+            od = self._scr[s](od)
             # --- modified Beer-Lambert -> Δ[HbO]/[HbR] ---
             if self._op is not None:
                 hbo_raw, hbr_raw = self._op.apply(od)  # MNE operator (D10)
@@ -101,16 +143,18 @@ class OnlineHemoPipeline:
                 # Placeholder mapping for the montage-free path.
                 hbo_raw = od
                 hbr_raw = -0.6 * od
-            # --- causal bandpass ---
+            if self._keep is not None:
+                hbo_raw = hbo_raw[self._keep]
+                hbr_raw = hbr_raw[self._keep]
             hbo[s] = self._bp_hbo[s](hbo_raw)
             hbr[s] = self._bp_hbr[s](hbr_raw)
-            # TODO(claude-code): TDDR motion correction (causal variant) and
-            # short-distance-channel regression go here (Phase 2, D10), validated
-            # against the MNE batch versions as oracles.
         return HemoFrame(t_lsl=frame.t_lsl, hbo=hbo, hbr=hbr, fs=self.fs)
 
     def reset(self) -> None:
         for s in self.subjects:
-            self._dc[s] = None
+            self._od[s].reset()
+            if self._tddr is not None:
+                self._tddr[s].reset()
+            self._scr[s].reset()
             self._bp_hbo[s].reset()
             self._bp_hbr[s].reset()

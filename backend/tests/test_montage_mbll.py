@@ -95,8 +95,8 @@ def test_montage_pipeline_end_to_end():
         assert frame.fnirs["sub-01"].shape[0] == montage.n_raw_channels
         hemo = pipe.process(frame)
         for s in subjects:
-            assert hemo.hbo[s].shape[0] == montage.n_pairs
-            assert hemo.hbr[s].shape[0] == montage.n_pairs
+            assert hemo.hbo[s].shape[0] == montage.n_long  # short channels dropped
+            assert hemo.hbr[s].shape[0] == montage.n_long
             assert np.all(np.isfinite(hemo.hbo[s]))
             assert np.all(np.isfinite(hemo.hbr[s]))
         frames += 1

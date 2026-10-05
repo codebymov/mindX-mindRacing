@@ -61,8 +61,12 @@ See the repository `CLAUDE.md` §4. The short version:
 
 Grep for `TODO(claude-code)`. The big numeric gaps to fill, all behind stable
 contracts so they don't require redesign:
-- proper MBLL with extinction coefficients + DPF (`preprocessing/online.py`)
-- causal TDDR + short-channel GLM regression
+- ~~proper MBLL with extinction coefficients + DPF~~ — done (D10 Phase 1, MNE operator)
+- ~~causal TDDR + short-channel regression~~ — done (D10 Phase 2, `preprocessing/causal.py`)
+- a properly designed causal Butterworth bandpass (`preprocessing/online.py` `_CausalBandpass`)
 - true Morlet wavelet coherence (`ins/coherence.py`)
 - real BIDS/DataLad/Postgres writers (`storage/recorder.py`)
-- pylsl `LSLSource` and `LSLOutletSink`
+- pylsl `LSLSource` (`LSLOutletSink` is done, D9)
+
+The MNE oracle tests (`test_montage_mbll.py`, `test_causal_preprocessing.py`)
+SKIP if `mne`/`mne-nirs` are missing — install `.[dev]` so they actually run.

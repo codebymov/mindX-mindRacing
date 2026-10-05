@@ -44,10 +44,10 @@ feedback signal.
               └──────────┬──────────┘
                          ▼
               ┌─────────────────────┐
-              │ preprocessing/      │  per-subject, ONLINE, causal only:
-              │ optical density →   │  - OD conversion
-              │ MBLL → Δ[HbO]/[HbR] │  - motion correction (TDDR)
-              │ + short-channel reg │  - bandpass, short-distance regression
+              │ preprocessing/      │  per-subject, ONLINE, causal only (MNE order):
+              │ optical density →   │  - OD (ref frozen at baseline lock)
+              │ MBLL → Δ[HbO]/[HbR] │  - motion correction (TDDR) → short-channel
+              │ + short-channel reg │    reg → MBLL → drop short chans → bandpass
               └──────────┬──────────┘
                          ▼
               ┌─────────────────────┐

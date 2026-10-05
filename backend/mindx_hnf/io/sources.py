@@ -84,12 +84,36 @@ class SyntheticSource:
         self.coherence_fn = coherence_fn or (lambda t: 0.5)
         self.duration_s = duration_s
         self._rng = np.random.default_rng(seed)
+        # Montage path only: per-subject systemic physiology (scalp blood flow,
+        # Mayer waves, respiration) present in EVERY channel, while short
+        # channels carry ONLY it — the structure short-channel regression
+        # exploits. Independent across subjects, so it adds no true INS.
+        self._short_rows = np.zeros(n_channels, dtype=bool)
+        self._sys_gain = np.zeros((n_channels, 1))
+        if montage is not None:
+            n_wl = len(montage.wavelengths)
+            self._short_rows = np.repeat(montage.short_mask, n_wl)
+            self._sys_gain = self._rng.uniform(0.6, 1.0, (n_channels, 1))
+        self._sys_state = {s: 0.0 for s in subjects}
+        self._sys_phase = {s: float(self._rng.uniform(0, 2 * np.pi)) for s in subjects}
         self._stopped = False
         self._t0 = lsl_clock()
 
     def _latent(self, t: np.ndarray) -> np.ndarray:
         # Shared slow hemodynamic oscillation around ~0.05 Hz.
         return np.sin(2 * np.pi * 0.05 * t) + 0.3 * np.sin(2 * np.pi * 0.09 * t)
+
+    def _systemic(self, s: SubjectId, t: np.ndarray) -> np.ndarray:
+        """Slow AR(1) drift + respiration (~0.25 Hz) for one subject, (n,)."""
+        a = np.exp(-1.0 / (10.0 * self.fs))  # ~10 s correlation time
+        out = np.empty(t.shape[0])
+        x = self._sys_state[s]
+        for i in range(t.shape[0]):
+            x = a * x + np.sqrt(1 - a * a) * self._rng.standard_normal()
+            out[i] = x
+        self._sys_state[s] = x
+        resp = 0.5 * np.sin(2 * np.pi * 0.25 * t + self._sys_phase[s])
+        return out + resp
 
     def frames(self) -> Iterator[RawFrame]:
         dt_chunk = self.chunk_samples / self.fs
@@ -111,6 +135,14 @@ class SyntheticSource:
                     + (1 - c) * self._rng.standard_normal((self.n_channels, n))
                     + indep * 0.2
                 )
+                if self.montage is not None:
+                    systemic = self._sys_gain * self._systemic(s, t)
+                    sig = sig + systemic
+                    # Short channels see only systemic physiology (+ sensor noise).
+                    n_short = int(self._short_rows.sum())
+                    sig[self._short_rows] = systemic[
+                        self._short_rows
+                    ] + 0.1 * self._rng.standard_normal((n_short, n))
                 # Convert to intensity-like positive values around a DC level.
                 fnirs[s] = 1.0 + 0.01 * sig
             sample_idx += n

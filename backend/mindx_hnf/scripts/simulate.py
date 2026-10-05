@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from pathlib import Path
 
 import numpy as np
 
@@ -20,6 +21,7 @@ from mindx_hnf.feedback.mapper import BaselineSmoothingMapper, ShamProvider
 from mindx_hnf.ins.coherence import WaveletCoherenceINS
 from mindx_hnf.io.sources import SyntheticSource
 from mindx_hnf.orchestrator import Orchestrator
+from mindx_hnf.preprocessing.montage import load_montage
 from mindx_hnf.preprocessing.online import OnlineHemoPipeline
 from mindx_hnf.session.protocol import Block, SessionPlan, SessionScheduler
 from mindx_hnf.contracts import BlockType
@@ -29,7 +31,14 @@ def build_demo(
     mode: FeedbackMode = FeedbackMode.REAL,
     fast: bool = True,
     sink: FeedbackSink | None = None,
+    montage: str | Path | None = None,
 ):
+    """Assemble the synthetic closed loop.
+
+    With ``montage`` (a montage YAML), the source emits wavelength-paired
+    intensities with systemic physiology and the pipeline runs the full MNE path
+    (OD -> TDDR -> short-channel regression -> MNE MBLL, D10).
+    """
     fs = 7.81
     subjects = ("sub-01", "sub-02")
     n_channels = 20
@@ -52,15 +61,19 @@ def build_demo(
     )
     duration = plan.total_seconds + 2
 
+    mont = load_montage(montage) if montage is not None else None
     source = SyntheticSource(
         n_channels=n_channels,
         fs=fs,
         subjects=subjects,
         coherence_fn=coherence_fn,
         duration_s=duration,
+        montage=mont,
     )
-    pre = OnlineHemoPipeline(subjects, n_channels, fs)
-    ins = WaveletCoherenceINS(subjects, fs, window_s=20.0 * scale + 2, update_every_s=1.0)
+    pre = OnlineHemoPipeline(subjects, n_channels, fs, montage=mont)
+    ins = WaveletCoherenceINS(
+        subjects, fs, window_s=20.0 * scale + 2, update_every_s=1.0
+    )
     sham = ShamProvider([0.3, 0.32, 0.35, 0.31, 0.34] * 50)
     mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=2.0)
     if sink is None:
@@ -88,6 +101,13 @@ def main() -> None:
         help="publish feedback over LSL (stream 'mindx_feedback') for Unity to "
         "subscribe to, instead of discarding it. Requires the [hardware] extra.",
     )
+    parser.add_argument(
+        "--montage",
+        type=Path,
+        default=None,
+        help="optode montage YAML (e.g. configs/montage_demo.yaml): run the full "
+        "MNE preprocessing path on wavelength-paired synthetic data (D10).",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -102,19 +122,27 @@ def main() -> None:
         from mindx_hnf.api.sink import LSLOutletSink
 
         sink = LSLOutletSink(subjects=("sub-01", "sub-02"))
-        print("Publishing feedback on LSL stream 'mindx_feedback' — "
-              "connect Unity (LslFeedbackTransport) now.")
-    orch, sink = build_demo(mode=mode, fast=not args.full, sink=sink)
+        print(
+            "Publishing feedback on LSL stream 'mindx_feedback' — "
+            "connect Unity (LslFeedbackTransport) now."
+        )
+    orch, sink = build_demo(
+        mode=mode, fast=not args.full, sink=sink, montage=args.montage
+    )
     stats = orch.run()
 
     levels = [s.level for s in getattr(sink, "published", [])]
     print(f"\nmode={mode.value}")
     print(f"frames={stats.n_frames} ins={stats.n_ins} feedback={stats.n_feedback}")
-    print(f"loop latency: mean={stats.mean_loop_latency_ms:.2f}ms "
-          f"max={stats.max_loop_latency_ms:.2f}ms")
+    print(
+        f"loop latency: mean={stats.mean_loop_latency_ms:.2f}ms "
+        f"max={stats.max_loop_latency_ms:.2f}ms"
+    )
     if levels:
-        print(f"feedback level: first={levels[0]:.3f} last={levels[-1]:.3f} "
-              f"min={min(levels):.3f} max={max(levels):.3f}")
+        print(
+            f"feedback level: first={levels[0]:.3f} last={levels[-1]:.3f} "
+            f"min={min(levels):.3f} max={max(levels):.3f}"
+        )
 
 
 if __name__ == "__main__":

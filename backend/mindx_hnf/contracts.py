@@ -16,7 +16,6 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
-
 # --------------------------------------------------------------------------- #
 # Identifiers
 # --------------------------------------------------------------------------- #
@@ -151,6 +150,20 @@ class OnlinePreprocessor(Protocol):
     def process(self, frame: RawFrame) -> HemoFrame: ...
 
     def reset(self) -> None: ...
+
+
+@runtime_checkable
+class BaselineLockable(Protocol):
+    """A stage whose reference is established during the baseline block, then frozen.
+
+    The orchestrator calls `lock_baseline` once, at the first frame after the
+    baseline block (or the first frame at all if the protocol has none).
+    """
+
+    @property
+    def baseline_locked(self) -> bool: ...
+
+    def lock_baseline(self) -> None: ...
 
 
 @runtime_checkable

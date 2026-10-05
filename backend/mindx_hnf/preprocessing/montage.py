@@ -56,6 +56,11 @@ class Montage:
         return len(self.channels) * len(self.wavelengths)
 
     @property
+    def n_long(self) -> int:
+        """Long (brain-signal) channels — what the online pipeline outputs."""
+        return sum(1 for c in self.channels if not c.short)
+
+    @property
     def short_mask(self) -> np.ndarray:
         """Boolean mask over pairs marking the short (regressor) channels."""
         return np.array([c.short for c in self.channels], dtype=bool)

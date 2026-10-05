@@ -17,7 +17,10 @@ dependencies = [
 [project.optional-dependencies]
 hardware = ["pylsl>=1.16"]   # real LSL streams (NIRSport2, movisens)
 analysis = ["pymc>=5.0", "arviz>=0.18"]  # offline-only heavy stats (WP5)
-dev = ["pytest>=8.0", "ruff>=0.4", "black>=24.0", "mypy>=1.9"]
+dev = [
+    "pytest>=8.0", "ruff>=0.4", "black>=24.0", "mypy>=1.9",
+    "mne-nirs>=0.7",  # OFFLINE oracle for short-channel regression tests only
+]
 
 [project.scripts]
 mindx-simulate = "mindx_hnf.scripts.simulate:main"
@@ -31,7 +34,7 @@ target-version = "py311"
 
 # These ship no type stubs / py.typed marker; don't fail mypy on their imports.
 [[tool.mypy.overrides]]
-module = ["pylsl", "mne", "mne.*", "yaml"]
+module = ["pylsl", "mne", "mne.*", "mne_nirs", "mne_nirs.*", "scipy", "scipy.*", "yaml"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

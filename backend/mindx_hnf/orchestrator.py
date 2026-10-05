@@ -18,9 +18,9 @@ from dataclasses import dataclass
 
 from mindx_hnf.api.sink import FeedbackSink
 from mindx_hnf.contracts import (
+    BaselineLockable,
     BlockType,
     FeedbackMapper,
-    FeedbackMode,
     INSEstimator,
     OnlinePreprocessor,
 )
@@ -76,6 +76,14 @@ class Orchestrator:
                 if block is None and self.scheduler.is_finished(elapsed):
                     break
 
+                # Freeze preprocessing references (OD) once the baseline block is
+                # over, BEFORE processing the first post-baseline frame.
+                if (
+                    isinstance(self.preprocessor, BaselineLockable)
+                    and not self.preprocessor.baseline_locked
+                    and (block is None or block.kind is not BlockType.BASELINE)
+                ):
+                    self.preprocessor.lock_baseline()
                 hemo = self.preprocessor.process(frame)
                 self.stats.n_frames += 1
                 if self.recorder is not None:

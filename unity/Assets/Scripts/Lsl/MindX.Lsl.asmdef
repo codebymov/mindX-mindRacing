@@ -1,0 +1,25 @@
+{
+    "name": "MindX.Lsl",
+    "rootNamespace": "MindX",
+    "references": [
+        "MindX.Runtime",
+        "labstreaminglayer.LSL4Unity.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "MINDX_LSL"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.labstreaminglayer.lsl4unity",
+            "expression": "",
+            "define": "MINDX_LSL"
+        }
+    ],
+    "noEngineReferences": false
+}

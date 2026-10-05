@@ -7,9 +7,11 @@
 // BOTH headsets run their own inlet on the same stream, so both receive the
 // identical joint feedback signal.
 //
-// REQUIRES the LSL4Unity package + the native liblsl binary for each target
-// platform. See docs/LSL_UNITY_SETUP.md. Until that package is installed this
-// file will not compile — that is expected; it is the one manual editor step.
+// REQUIRES the LSL4Unity package (com.labstreaminglayer.lsl4unity) + the native
+// liblsl binary for each target platform. See docs/LSL_UNITY_SETUP.md. This file
+// lives in the MindX.Lsl assembly, which compiles ONLY when that package is
+// installed (versionDefines -> MINDX_LSL); without it the rest of the game still
+// compiles and FeedbackReceiver idles. Decoding is FeedbackWire.Decode (core).
 //
 // NOTE ON THE LSL C# NAMESPACE: current LSL4Unity ships the modern bindings in
 // namespace `LSL` (class `LSL.LSL`, types `StreamInlet`/`StreamInfo`). Older
@@ -29,11 +31,18 @@ namespace MindX
     /// keep only the newest sample and never let a stale value win.
     public class LslFeedbackTransport : IFeedbackTransport
     {
-        // Channel order is the contract with LSLOutletSink.FEEDBACK_CHANNELS.
-        private const int ChannelCount = 5; // level, raw_ins, mode, session_mode, subject_index
+        /// <summary>
+        /// Registers this transport as the factory core components use, before
+        /// any scene loads.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Register()
+        {
+            FeedbackTransports.Factory = name => new LslFeedbackTransport(name);
+        }
 
         private StreamInlet _inlet;
-        private readonly float[] _buf = new float[ChannelCount];
+        private readonly float[] _buf = new float[FeedbackWire.ChannelCount];
         private readonly List<string> _subjectIds = new List<string>(); // index -> subject id
         private FeedbackSample _latest;
 
@@ -74,27 +83,12 @@ namespace MindX
                 double ts;
                 while ((ts = _inlet.pull_sample(_buf, 0.0)) != 0.0)
                 {
-                    _latest = Decode(_buf, ts);
+                    _latest = FeedbackWire.Decode(_buf, ts, _subjectIds);
                     gotNew = true;
                 }
             }
             sample = _latest;
             return gotNew;
-        }
-
-        private FeedbackSample Decode(float[] v, double tLsl)
-        {
-            int subjIdx = Mathf.RoundToInt(v[4]);
-            return new FeedbackSample
-            {
-                tLsl = tLsl,                       // backend LSL clock — one clock of record
-                level = v[0],
-                rawIns = v[1],
-                mode = v[2] < 0.5f ? "real" : "sham",
-                sessionMode = v[3] < 0.5f ? "hyperscanning" : "individual",
-                subjectIndex = subjIdx,            // -1 = shared dyad car (Hyperscanning)
-                subject = (subjIdx >= 0 && subjIdx < _subjectIds.Count) ? _subjectIds[subjIdx] : null,
-            };
         }
 
         public void Close()

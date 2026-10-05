@@ -1,0 +1,25 @@
+{
+    "name": "MindX.Ubiq",
+    "rootNamespace": "MindX",
+    "references": [
+        "MindX.Runtime",
+        "Ubiq"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "MINDX_UBIQ"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.ucl.ubiq",
+            "expression": "",
+            "define": "MINDX_UBIQ"
+        }
+    ],
+    "noEngineReferences": false
+}

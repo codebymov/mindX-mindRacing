@@ -10,8 +10,10 @@
 // an LSL4Unity inlet on the "mindx_feedback" stream. It stays behind
 // IFeedbackTransport so this component is transport-agnostic and testable with a
 // mock. Attach one FeedbackReceiver per car; `carSubjectIndex` routes samples:
-// a Hyperscanning sample (shared, subjectIndex < 0) drives every car, while an
-// Individual sample drives only the car whose owner it names (D8).
+// a Hyperscanning sample (shared, subjectIndex == -1) drives every car, an
+// Individual sample drives only the car whose owner it names (D8), and an
+// unroutable sample (-2, unknown subject) drives none. The rule lives in
+// FeedbackWire.Drives and is pinned by contracts/feedback_wire.json.
 
 using UnityEngine;
 
@@ -27,8 +29,9 @@ namespace MindX
         public string mode;        // "real" | "sham" — for logging ONLY, never branch on it
         public float rawIns;       // pre-mapping INS, for logging
         public string sessionMode; // "hyperscanning" | "individual" (DECISIONS.md D8)
-        public int subjectIndex;   // -1 = shared dyad car (hyperscanning); else the
-                                   // owning subject's index (individual) — used to route
+        public int subjectIndex;   // -1 = shared dyad car (hyperscanning); -2 = unknown
+                                   // subject (drives no car); else the owning subject's
+                                   // index (individual) — used to route
         public string subject;     // decoded subject id for logging (null when shared)
     }
 
@@ -68,7 +71,7 @@ namespace MindX
             {
                 try
                 {
-                    _transport = new LslFeedbackTransport(streamName);
+                    _transport = FeedbackTransports.Create(streamName);
                     Debug.Log($"[MindX] FeedbackReceiver connected to LSL '{streamName}'.");
                 }
                 catch (System.Exception e)
@@ -89,8 +92,10 @@ namespace MindX
             {
                 // Route: shared (Hyperscanning) sample drives every car; an
                 // Individual sample drives only its owning car.
-                if (s.subjectIndex < 0 || s.subjectIndex == carSubjectIndex)
+                if (FeedbackWire.Drives(s.subjectIndex, carSubjectIndex))
+                {
                     _currentLevel = Mathf.Clamp01(s.level);
+                }
                 // TODO: log (s.tLsl, s.level, s.mode, s.rawIns) for offline analysis.
             }
 

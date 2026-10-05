@@ -33,19 +33,25 @@ This is the one step that must be done in the Unity Editor (it is not committed,
 because a bad package URL breaks project resolution for everyone):
 
 1. **Window ▸ Package Manager ▸ + ▸ Add package from git URL…**
-   Add the LSL4Unity UPM package, e.g.
-   `https://github.com/labstreaminglayer/LSL4Unity.git#upm`
-   (confirm the current URL/branch — forks move; the package must expose the
-   `LSL` C# namespace with `StreamInlet`/`StreamInfo`).
+   `https://github.com/labstreaminglayer/LSL4Unity.git`
+   (verified 2026-10-05: `package.json` is at the repo root on `master`, package
+   `com.labstreaminglayer.lsl4unity` 1.16.0; there is no `#upm` branch). It
+   exposes the `LSL` namespace (`LSL.LSL.resolve_stream`, `StreamInlet`,
+   `StreamInfo`) in assembly `labstreaminglayer.LSL4Unity.Runtime`.
 2. **Place the native `liblsl` binary** for each target platform under
    `unity/Assets/Plugins/` (or wherever the package expects it):
    - Windows editor/standalone: `lsl.dll` (x86_64)
    - Android / Quest (if building to headset): `liblsl.so` (arm64-v8a)
    The managed C# wrapper needs the matching native lib or `resolve_stream`
    throws at runtime.
-3. If you get a namespace compile error in `LslFeedbackTransport.cs`, swap
-   `LSL.LSL.resolve_stream` → `LSL.liblsl.resolve_stream` (older fork layout).
-   The logic is identical; only the namespace differs.
+3. Nothing else to enable: `Assets/Scripts/Lsl/MindX.Lsl.asmdef` turns on
+   `MINDX_LSL` automatically when the package is present (`versionDefines`),
+   which compiles `LslFeedbackTransport` and registers it with
+   `FeedbackTransports`. **Without the package the rest of the game still
+   compiles** and `FeedbackReceiver` idles at base speed. (Compile-checked on
+   2026-10-05 against `LSL.cs` from LSL4Unity master with Unity's own Roslyn.)
+   An older fork exposing `LSL.liblsl.resolve_stream` instead would need that
+   one call swapped.
 
 ## 3. Unity: wire the scene
 

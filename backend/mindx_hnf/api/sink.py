@@ -22,6 +22,9 @@ SESSION_MODE_CODE: dict[SessionMode, float] = {
 }
 #: subject_index sentinel for the shared dyad signal (Hyperscanning, both cars).
 SHARED_SUBJECT_INDEX: float = -1.0
+#: subject_index sentinel for a sample naming a subject this sink doesn't know.
+#: Unity drives NO car with it (a config error must never move the wrong car).
+UNROUTABLE_SUBJECT_INDEX: float = -2.0
 
 #: Feedback stream channel layout (order is the contract with LslFeedbackTransport).
 FEEDBACK_CHANNELS: tuple[str, ...] = (
@@ -31,6 +34,39 @@ FEEDBACK_CHANNELS: tuple[str, ...] = (
     "session_mode",
     "subject_index",
 )
+
+
+def encode_feedback(
+    sample: FeedbackSample, subjects: Sequence[SubjectId]
+) -> list[float]:
+    """Encodes a feedback sample as the LSL wire vector.
+
+    The wire format is specified once in ``contracts/feedback_wire.json`` and
+    decoded by ``FeedbackWire.Decode`` on the Unity side; both are tested
+    against that file's golden cases.
+
+    Args:
+        sample: The feedback sample to encode.
+        subjects: Subject ids in channel-index order; a subject's position is
+            the ``subject_index`` Unity routes on.
+
+    Returns:
+        One float per entry of ``FEEDBACK_CHANNELS``, in that order.
+    """
+    if sample.subject is None:
+        subject_index = SHARED_SUBJECT_INDEX
+    elif sample.subject in subjects:
+        subject_index = float(list(subjects).index(sample.subject))
+    else:
+        # Kept off the raising path — this is the hot loop.
+        subject_index = UNROUTABLE_SUBJECT_INDEX
+    return [
+        float(sample.level),
+        float(sample.raw_ins),
+        MODE_CODE[sample.mode],
+        SESSION_MODE_CODE[sample.session_mode],
+        subject_index,
+    ]
 
 
 class FeedbackSink(Protocol):
@@ -105,26 +141,10 @@ class LSLOutletSink:  # pragma: no cover - needs pylsl
             subj_desc.append_child_value(str(i), sid)
         self._outlet: StreamOutlet | None = StreamOutlet(info)
 
-    def _subject_index(self, subject: SubjectId | None) -> float:
-        if subject is None:
-            return SHARED_SUBJECT_INDEX
-        try:
-            return float(self._subjects.index(subject))
-        except ValueError:
-            # Unknown subject is a config error; route nowhere rather than to the
-            # wrong car. Kept off the raising path — this is the hot loop.
-            return SHARED_SUBJECT_INDEX
-
     def publish(self, sample: FeedbackSample) -> None:
         if self._outlet is None:
             return
-        vector = [
-            float(sample.level),
-            float(sample.raw_ins),
-            MODE_CODE[sample.mode],
-            SESSION_MODE_CODE[sample.session_mode],
-            self._subject_index(sample.subject),
-        ]
+        vector = encode_feedback(sample, self._subjects)
         # Push with the sample's own LSL timestamp — one clock of record.
         self._outlet.push_sample(vector, timestamp=sample.t_lsl)
 

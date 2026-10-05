@@ -97,8 +97,14 @@ backend/                    Python real-time backend (primary codebase)
   tests/                    pytest; the INS + sham + latency tests are load-bearing
   configs/                  YAML run configs (montage, bands, protocol timings)
   scripts/                  CLI entry points (run_session, replay, simulate)
+  requirements.lock         locked deps (all platforms) — install from this
 unity/                      Unity XR project (mind racing game) — C#
-  Assets/Scripts/           game logic, LSL inlet, feedback → car/audio mapping
+  Assets/Scripts/           MindX.Runtime asmdef: game logic, feedback → car/audio
+    Lsl/ , Ubiq/            optional asmdefs, compile only if the package exists
+  Assets/Tests/EditMode/    NUnit EditMode tests (wire contract, receiver)
+contracts/                  language-neutral specs shared by Python AND C# tests
+  feedback_wire.json        the backend → Unity LSL vector (single source of truth)
+.github/workflows/          CI (backend: ruff, black, mypy, pytest on Linux+Windows)
 analysis/                   OFFLINE analysis (Bayesian models, WP5). NOT real-time.
 docs/                       architecture, glossary, protocol, hardware notes
 .claude/                    Claude Code config: this dir + commands
@@ -159,8 +165,14 @@ See `backend/README.md`. Key entry points:
 - `python -m mindx_hnf.scripts.simulate` — run the whole loop on synthetic data
   (no hardware). **Use this for development and CI.**
 - `python -m mindx_hnf.scripts.run_session --config configs/default.yaml` — live.
-- `pytest` in `backend/` — the latency, INS-correctness, and sham-integrity
-  tests are the ones that actually guard the science. Don't let them rot.
+- `pytest -rs` in `backend/` — the latency, INS-correctness, sham-integrity and
+  MNE-oracle tests are the ones that actually guard the science. Don't let them
+  rot, and never let them silently skip (`-rs` shows skips).
+- Test layers, the cross-language contract, and the Unity test run:
+  `docs/TESTING.md`. Changing the feedback wire format means editing
+  `contracts/feedback_wire.json` AND both sides, with both suites green.
+- Style: Python = Google style + Google docstrings (ruff `D`, convention
+  google); C# = Microsoft/.NET + Unity (`unity/.editorconfig`).
 
 ## 7. Open questions / decisions not yet made
 

@@ -59,7 +59,7 @@ namespace MindX
             {
                 try
                 {
-                    _feedback = new LslFeedbackTransport(streamName);
+                    _feedback = FeedbackTransports.Create(streamName);
                     Debug.Log($"[MindX] SharedCarAuthority (host) connected to LSL '{streamName}'.");
                 }
                 catch (System.Exception e)

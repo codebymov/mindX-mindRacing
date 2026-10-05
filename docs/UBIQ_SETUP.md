@@ -36,10 +36,12 @@ Not committed to `manifest.json` (a bad package URL breaks resolution for
 everyone — same policy as LSL4Unity):
 
 1. **Window ▸ Package Manager ▸ + ▸ Add package from git URL…**
-   `https://github.com/UCL-VR/ubiq.git?path=/Unity/Assets/Runtime` *(confirm the
-   current UPM path/branch on the Ubiq repo — the layout has moved between
-   releases).* Ubiq exposes the `Ubiq.Messaging` namespace used by
-   `UbiqSharedCarNetwork.cs`.
+   `https://github.com/UCL-VR/ubiq.git?path=/Unity/Assets/Ubiq` (verified
+   2026-10-05: package `com.ucl.ubiq` 1.0.0-pre.16, runtime assembly `Ubiq`;
+   pin a tag with `#<tag>` for reproducibility). Ubiq exposes the
+   `Ubiq.Messaging` / `Ubiq.Spawning` namespaces used by `Assets/Scripts/Ubiq/`.
+   `MindX.Ubiq.asmdef` turns on `MINDX_UBIQ` automatically when the package is
+   present; without it those scripts are simply not compiled.
 2. Ubiq needs a **room server**. For a lab, run the Node.js server **on the lab
    PC / LAN** (Ubiq ships it under `Node/`): `npm install && node server.js`.
    Point the scene's `NetworkScene` config at that LAN address — **no cloud**.
@@ -104,9 +106,9 @@ events, and the calibration prompts (`CalibrationUIController`).
 
 Still manual / next:
 - **Install the Ubiq package + run the room server + in-editor compile/verify**
-  (step 1). The Ubiq-dependent scripts (`UbiqSharedCarNetwork`,
-  `SharedCarSpawner`) only compile once the package is present — scaffolding
-  pending an Editor build pass, like the LSL4Unity transport was.
+  (step 1). The Ubiq-dependent scripts (`Assets/Scripts/Ubiq/`, assembly
+  `MindX.Ubiq`) only compile once the package is present; they have NOT yet
+  been compiled against Ubiq (unlike the LSL transport) — first Editor pass.
 - Build the **car prefab** + register it in the `PrefabCatalogue`.
 - Add the **`AvatarManager`** + a three-point avatar prefab, and a world-space
   Canvas bound to `CalibrationUIController.PromptChanged`.

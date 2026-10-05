@@ -50,3 +50,6 @@ unity/UserSettings/
 # Env / secrets
 .env
 *.local.yaml
+
+# Claude Code agent worktrees (temporary, per-session)
+.claude/worktrees/

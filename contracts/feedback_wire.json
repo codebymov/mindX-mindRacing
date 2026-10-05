@@ -1,0 +1,72 @@
+{
+  "_comment": "Single source of truth for the backend -> Unity feedback wire format (D9). Read by backend/tests/test_wire_contract.py AND unity/Assets/Tests/EditMode/FeedbackWireContractTests.cs; both encode/decode the golden cases below, so a change on one side without the other fails a test. Bump 'version' on any breaking change. Kept JsonUtility-compatible: no nulls, no maps (empty subject string = shared).",
+  "version": 2,
+  "stream": {
+    "name": "mindx_feedback",
+    "type": "mindx_feedback",
+    "channelFormat": "float32",
+    "sourceId": "mindx_feedback_v1",
+    "subjectsDescKey": "subjects"
+  },
+  "channels": ["level", "raw_ins", "mode", "session_mode", "subject_index"],
+  "modeCodes": [
+    { "name": "real", "code": 0 },
+    { "name": "sham", "code": 1 }
+  ],
+  "sessionModeCodes": [
+    { "name": "hyperscanning", "code": 0 },
+    { "name": "individual", "code": 1 }
+  ],
+  "sharedSubjectIndex": -1,
+  "unroutableSubjectIndex": -2,
+  "cases": [
+    {
+      "name": "hyperscanning_real_shared",
+      "subjects": ["sub-01", "sub-02"],
+      "tLsl": 12345.678,
+      "level": 0.42,
+      "rawIns": 0.37,
+      "mode": "real",
+      "sessionMode": "hyperscanning",
+      "subject": "",
+      "vector": [0.42, 0.37, 0, 0, -1],
+      "drivesCars": [0, 1]
+    },
+    {
+      "name": "individual_sham_second_subject",
+      "subjects": ["sub-01", "sub-02"],
+      "tLsl": 1.0,
+      "level": 0.9,
+      "rawIns": 0.5,
+      "mode": "sham",
+      "sessionMode": "individual",
+      "subject": "sub-02",
+      "vector": [0.9, 0.5, 1, 1, 1],
+      "drivesCars": [1]
+    },
+    {
+      "name": "individual_real_first_subject",
+      "subjects": ["sub-01", "sub-02"],
+      "tLsl": 77.25,
+      "level": 0.0,
+      "rawIns": 0.12,
+      "mode": "real",
+      "sessionMode": "individual",
+      "subject": "sub-01",
+      "vector": [0.0, 0.12, 0, 1, 0],
+      "drivesCars": [0]
+    },
+    {
+      "name": "individual_unknown_subject_drives_no_car",
+      "subjects": ["sub-01", "sub-02"],
+      "tLsl": 5.5,
+      "level": 1.0,
+      "rawIns": 0.8,
+      "mode": "real",
+      "sessionMode": "individual",
+      "subject": "sub-99",
+      "vector": [1.0, 0.8, 0, 1, -2],
+      "drivesCars": []
+    }
+  ]
+}

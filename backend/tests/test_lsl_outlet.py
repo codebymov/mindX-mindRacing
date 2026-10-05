@@ -13,7 +13,10 @@ import time
 
 import pytest
 
-pytest.importorskip("pylsl")
+try:
+    import pylsl  # noqa: F401
+except (ImportError, RuntimeError) as exc:  # RuntimeError: liblsl binary missing
+    pytest.skip(f"pylsl/liblsl unavailable: {exc}", allow_module_level=True)
 
 from pylsl import StreamInlet, resolve_byprop  # noqa: E402
 

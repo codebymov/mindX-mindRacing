@@ -1,0 +1,40 @@
+# Backend CI: lint, type-check and the full pytest suite (including the MNE
+# oracle tests and the cross-language wire-contract test) on every push and PR.
+# Installs the LOCKED dependency set so CI runs exactly what the lab runs.
+name: backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+          pip install -e . --no-deps
+      - name: ruff
+        run: ruff check mindx_hnf tests
+      - name: black
+        run: black --check mindx_hnf tests
+      - name: mypy
+        run: mypy mindx_hnf
+      - name: pytest
+        # -rs lists skipped tests so a silently skipped oracle test is visible.
+        run: pytest -q -rs

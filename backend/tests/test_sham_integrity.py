@@ -56,4 +56,5 @@ def test_baseline_correction_applies_equally():
         mapper.observe_baseline(_ins(0.4))
     mapper.lock_baseline()
     out = mapper.map(_ins(0.4), FeedbackMode.REAL)
-    assert out.level == 0.0  # at-baseline synchrony => zero feedback
+    # Zero up to float rounding: the baseline is a mean (1e-16 off on numpy 2.4).
+    assert abs(out.level) < 1e-12  # at-baseline synchrony => zero feedback

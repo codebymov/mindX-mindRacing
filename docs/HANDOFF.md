@@ -85,3 +85,6 @@ at the end of every session, in the same commit as the work.
   wavelengths on the 760 nm short channel (we pair by wavelength). Corrected
   LSL4Unity/Ubiq install URLs. Mutation check: changing the channel order, a
   sentinel, or the sham code on the Python side now fails the contract test.
+  First CI run (Linux+Windows × Py 3.11/3.13) caught an exact-float assert in
+  `test_sham_integrity.py` failing on numpy 2.4 (1e-16); fixed with a 1e-12
+  tolerance.

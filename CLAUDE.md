@@ -1,6 +1,8 @@
 # CLAUDE.md — mindX: Multiuser XR-Enhanced Neuromodulation
 
 This file orients Claude Code to the project. Read it fully before making changes.
+**Then read `docs/HANDOFF.md`** — current state and the next tasks, kept up to
+date at the end of every session.
 It is the single source of truth for *what the system is*, *how data flows*, and
 *the rules you must not break*. When you change architecture, update this file in
 the same commit.

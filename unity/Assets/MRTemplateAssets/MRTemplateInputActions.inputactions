@@ -1,5 +1,6 @@
 {
-    "name": "MR Template Input Actions",
+    "version": 1,
+    "name": "MRTemplateInputActions",
     "maps": [
         {
             "name": "LeftHand",

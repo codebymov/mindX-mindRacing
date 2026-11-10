@@ -25,6 +25,7 @@ unity/Logs/
 unity/UserSettings/
 *.csproj
 *.sln
+*.slnx
 
 # Stray Unity project regenerated at the MONOREPO ROOT (the real project is in
 # unity/). A misdirected Unity Editor sometimes recreates an empty shell here;

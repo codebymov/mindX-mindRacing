@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,6 +24,7 @@ from mindx_hnf.io.sources import SyntheticSource
 from mindx_hnf.orchestrator import Orchestrator
 from mindx_hnf.preprocessing.montage import load_montage
 from mindx_hnf.preprocessing.online import OnlineHemoPipeline
+from mindx_hnf.session.mode_switch import FeedbackModeSwitch
 from mindx_hnf.session.protocol import Block, SessionPlan, SessionScheduler
 
 #: Ground-truth coherence while the dyad is not synchronising (baseline, rest).
@@ -37,16 +40,24 @@ RAMP_FRACTION = 0.6
 DEMO_GAIN = 10.0
 
 
-def coherence_profile(plan: SessionPlan) -> Callable[[float], float]:
+def coherence_profile(
+    plan: SessionPlan,
+    *,
+    delay_s: float = 0.0,
+    ramp_fraction: float = RAMP_FRACTION,
+) -> Callable[[float], float]:
     """Build the synthetic ground-truth coherence over the session timeline.
 
     Coherence stays low during the baseline and rest blocks, so the mapper
     measures a genuine resting baseline, and ramps linearly from
-    ``COHERENCE_LOW`` to ``COHERENCE_HIGH`` over the first ``RAMP_FRACTION`` of
+    ``COHERENCE_LOW`` to ``COHERENCE_HIGH`` over the first ``ramp_fraction`` of
     each feedback block, then holds.
 
     Args:
         plan: The session plan whose block timing defines the ramps.
+        delay_s: Shifts the whole profile later, giving a dyad that synchronises
+            later than the plan's schedule (used for the sham dyad).
+        ramp_fraction: Fraction of a feedback block over which coherence ramps.
 
     Returns:
         A function mapping session time in seconds to coherence in [0, 1].
@@ -58,11 +69,12 @@ def coherence_profile(plan: SessionPlan) -> Callable[[float], float]:
         t += block.duration_s
 
     def coherence_fn(t_s: float) -> float:
+        t_s -= delay_s
         for start, block in starts:
             if start <= t_s < start + block.duration_s:
                 if not block.feedback:
                     return COHERENCE_LOW
-                ramp_s = max(block.duration_s * RAMP_FRACTION, 1e-9)
+                ramp_s = max(block.duration_s * ramp_fraction, 1e-9)
                 frac = min(1.0, (t_s - start) / ramp_s)
                 return COHERENCE_LOW + frac * (COHERENCE_HIGH - COHERENCE_LOW)
         return COHERENCE_LOW
@@ -70,11 +82,78 @@ def coherence_profile(plan: SessionPlan) -> Callable[[float], float]:
     return coherence_fn
 
 
+#: RNG seed of the sham dyad (a different dyad from the live one, seed 0).
+SHAM_SEED = 7
+
+
+def build_sham_trace(
+    plan: SessionPlan,
+    *,
+    fs: float,
+    subjects: tuple[str, str],
+    n_channels: int,
+    window_s: float,
+    montage=None,
+    seed: int = SHAM_SEED,
+) -> list[float]:
+    """Record another synthetic dyad's INS trace for the same session plan.
+
+    Sham feedback replays a real trajectory from a different dyad doing the same
+    task. The other dyad runs through the identical pipeline and estimator (so the
+    values are on the same INS scale) but has its own noise (a different seed) and
+    synchronises later and more slowly than the live dyad, so its course is
+    independent of the live dyad's.
+
+    Args:
+        plan: The session plan; only feedback-block INS values are returned.
+        fs: Sampling rate in Hz.
+        subjects: The two subjects of the sham dyad.
+        n_channels: Raw channels per subject.
+        window_s: INS window length in seconds (same as the live estimator).
+        montage: Optional montage, so the trace uses the same preprocessing path.
+        seed: RNG seed of the sham dyad.
+
+    Returns:
+        The INS values emitted during feedback blocks, in delivery order.
+    """
+    feedback_blocks = [b for b in plan.blocks if b.feedback]
+    delay_s = 0.25 * max(b.duration_s for b in feedback_blocks)
+    source = SyntheticSource(
+        n_channels=n_channels,
+        fs=fs,
+        subjects=subjects,
+        coherence_fn=coherence_profile(plan, delay_s=delay_s, ramp_fraction=0.8),
+        seed=seed,
+        duration_s=plan.total_seconds + 2,
+        montage=montage,
+        realtime=False,
+    )
+    pre = OnlineHemoPipeline(subjects, n_channels, fs, montage=montage)
+    ins = WaveletCoherenceINS(subjects, fs, window_s=window_s, update_every_s=1.0)
+    scheduler = SessionScheduler(plan)
+
+    trace: list[float] = []
+    t_first: float | None = None
+    locked = False
+    for frame in source.frames():
+        if t_first is None:
+            t_first = frame.t_lsl
+        block = scheduler.current_block(frame.t_lsl - t_first)
+        if not locked and (block is None or block.kind is not BlockType.BASELINE):
+            pre.lock_baseline()
+            locked = True
+        sample = ins.update(pre.process(frame))
+        if sample is not None and block is not None and block.feedback:
+            trace.append(sample.value)
+    return trace
+
+
 def build_demo(
     mode: FeedbackMode = FeedbackMode.REAL,
     fast: bool = True,
     sink: FeedbackSink | None = None,
     montage: str | Path | None = None,
+    mode_switch: FeedbackModeSwitch | None = None,
 ):
     """Assemble the synthetic closed loop.
 
@@ -90,6 +169,8 @@ def build_demo(
             wavelength-paired intensities with systemic physiology and the
             pipeline runs the full MNE path (OD -> TDDR -> short-channel
             regression -> MNE MBLL, D10).
+        mode_switch: Optional operator switch to flip between real and sham
+            while the loop runs.
 
     Returns:
         The ready-to-run orchestrator and the sink it publishes to.
@@ -122,10 +203,18 @@ def build_demo(
         montage=mont,
     )
     pre = OnlineHemoPipeline(subjects, n_channels, fs, montage=mont)
-    ins = WaveletCoherenceINS(
-        subjects, fs, window_s=20.0 * scale + 2, update_every_s=1.0
+    window_s = 20.0 * scale + 2
+    ins = WaveletCoherenceINS(subjects, fs, window_s=window_s, update_every_s=1.0)
+    sham = ShamProvider(
+        build_sham_trace(
+            plan,
+            fs=fs,
+            subjects=subjects,
+            n_channels=n_channels,
+            window_s=window_s,
+            montage=mont,
+        )
     )
-    sham = ShamProvider([0.3, 0.32, 0.35, 0.31, 0.34] * 50)
     mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=DEMO_GAIN)
     if sink is None:
         sink = NullSink()
@@ -138,8 +227,27 @@ def build_demo(
         mapper=mapper,
         sink=sink,
         scheduler=scheduler,
+        mode_switch=mode_switch,
     )
     return orch, sink
+
+
+def _operator_console(switch: FeedbackModeSwitch) -> None:
+    """Flip real/sham each time the operator presses Enter (or types ``s``).
+
+    This is an operator tool on the backend terminal. Nothing participant-facing
+    shows or reads it.
+
+    Args:
+        switch: The switch the running orchestrator reads every frame.
+    """
+    for line in sys.stdin:
+        command = line.strip().lower()
+        if command in ("", "s"):
+            new = switch.toggle("console")
+            print(f"[operator] feedback source -> {new.value.upper()}", flush=True)
+        elif command == "q":
+            break
 
 
 def main() -> None:
@@ -167,6 +275,12 @@ def main() -> None:
         help="write every feedback sample (t_lsl, level, raw_ins, ...) to this CSV "
         "when the run ends; works with or without --lsl.",
     )
+    parser.add_argument(
+        "--toggle",
+        action="store_true",
+        help="operator console: press Enter (or type s) in this terminal to switch "
+        "feedback between REAL and SHAM while the session runs.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -187,10 +301,24 @@ def main() -> None:
         )
     if args.log_csv is not None:
         sink = RecordingSink(sink, args.log_csv)
+    switch = FeedbackModeSwitch(mode)
     orch, sink = build_demo(
-        mode=mode, fast=not args.full, sink=sink, montage=args.montage
+        mode=mode,
+        fast=not args.full,
+        sink=sink,
+        montage=args.montage,
+        mode_switch=switch,
     )
+    if args.toggle:
+        threading.Thread(target=_operator_console, args=(switch,), daemon=True).start()
+        print(
+            "Operator console: press Enter (or type s) to switch REAL <-> SHAM. "
+            f"Starting in {mode.value.upper()}.",
+            flush=True,
+        )
     stats = orch.run()
+    for who, new_mode in switch.history:
+        print(f"[operator] switched to {new_mode.value} ({who})")
     if args.log_csv is not None:
         print(f"feedback samples written to {args.log_csv}")
 

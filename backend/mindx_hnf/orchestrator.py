@@ -21,11 +21,13 @@ from mindx_hnf.contracts import (
     BaselineLockable,
     BlockType,
     FeedbackMapper,
+    FeedbackMode,
     INSEstimator,
     OnlinePreprocessor,
 )
 from mindx_hnf.feedback.mapper import BaselineSmoothingMapper
 from mindx_hnf.io.sources import FrameSource, lsl_clock
+from mindx_hnf.session.mode_switch import FeedbackModeSwitch
 from mindx_hnf.session.protocol import SessionScheduler
 from mindx_hnf.storage.recorder import ArtifactRecorder
 
@@ -75,6 +77,7 @@ class Orchestrator:
         sink: FeedbackSink,
         scheduler: SessionScheduler,
         recorder: ArtifactRecorder | None = None,
+        mode_switch: FeedbackModeSwitch | None = None,
     ) -> None:
         """Wire the stages; nothing runs until ``run``.
 
@@ -86,7 +89,13 @@ class Orchestrator:
             sink: Feedback transport to the game; closed when the run ends.
             scheduler: Block schedule and safety boundary.
             recorder: Optional non-blocking persistence.
+            mode_switch: Optional operator switch read every frame. Without it
+                the session plan's mode applies for the whole run. With it, the
+                sham replay keeps pace with task time even while real feedback
+                is delivered, so switching to sham mid-session continues the
+                other dyad's trace at the matching point.
         """
+        self.mode_switch = mode_switch
         self.source = source
         self.preprocessor = preprocessor
         self.ins = ins
@@ -113,6 +122,8 @@ class Orchestrator:
         try:
             for frame in self.source.frames():
                 tick = time.perf_counter()
+                if self.mode_switch is not None:
+                    mode = self.mode_switch.mode
                 elapsed = frame.t_lsl - t_start
                 block = self.scheduler.current_block(elapsed)
                 if block is None and self.scheduler.is_finished(elapsed):
@@ -147,6 +158,14 @@ class Orchestrator:
                             and not self.mapper._baseline_locked
                         ):
                             self.mapper.lock_baseline()
+                        if (
+                            self.mode_switch is not None
+                            and mode is FeedbackMode.REAL
+                            and isinstance(self.mapper, BaselineSmoothingMapper)
+                            and self.mapper.sham is not None
+                        ):
+                            # Keep the sham trace indexed by task time.
+                            self.mapper.sham.next_value()
                         fb = self.mapper.map(ins_sample, mode)
                         self.sink.publish(fb)
                         self.stats.n_feedback += 1

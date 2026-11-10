@@ -88,6 +88,7 @@ class SyntheticSource:
         coherence_fn: Ground-truth coherence in [0, 1] as a function of
             elapsed seconds.
         duration_s: Run length in seconds; None runs until ``stop``.
+        realtime: Whether frames are paced to the clock (False: offline).
     """
 
     def __init__(
@@ -101,6 +102,7 @@ class SyntheticSource:
         seed: int = 0,
         duration_s: float | None = None,
         montage=None,
+        realtime: bool = True,
     ) -> None:
         """Create the source.
 
@@ -117,7 +119,11 @@ class SyntheticSource:
                 wavelength-paired intensities in the montage's channel order,
                 with per-subject systemic physiology in every channel and only
                 that in short channels (D10).
+            realtime: Pace frames to the clock. False generates the whole run
+                instantly with sample-index timestamps (offline traces, such as a
+                sham dyad's recording).
         """
+        self.realtime = realtime
         # With a montage, emit wavelength-paired intensities in the montage's
         # channel order so the MNE Beer-Lambert MBLL path can run end-to-end on
         # synthetic data (D10). The signal model is unchanged; only the channel
@@ -192,7 +198,10 @@ class SyntheticSource:
         dt_chunk = self.chunk_samples / self.fs
         sample_idx = 0
         while not self._stopped:
-            t_lsl = lsl_clock()
+            if self.realtime:
+                t_lsl = lsl_clock()
+            else:
+                t_lsl = self._t0 + sample_idx / self.fs
             elapsed = t_lsl - self._t0
             if self.duration_s is not None and elapsed > self.duration_s:
                 return
@@ -221,7 +230,8 @@ class SyntheticSource:
             sample_idx += n
             yield RawFrame(t_lsl=t_lsl, fnirs=fnirs, aux={}, fs=self.fs)
             # Pace to roughly real time so latency tests are meaningful.
-            time.sleep(max(0.0, dt_chunk))
+            if self.realtime:
+                time.sleep(max(0.0, dt_chunk))
 
     def stop(self) -> None:
         """Stop yielding frames after the current one."""

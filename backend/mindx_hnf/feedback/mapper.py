@@ -43,6 +43,11 @@ class ShamProvider:
         self._values = recorded_values
         self._it: Iterator[float] = iter(self._values)
 
+    @property
+    def trace(self) -> tuple[float, ...]:
+        """Gets a read-only copy of the recorded trace."""
+        return tuple(self._values)
+
     def next_value(self) -> float:
         """Return the next recorded value, looping the trace when exhausted.
 

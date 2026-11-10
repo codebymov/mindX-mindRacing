@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Callable
 from pathlib import Path
-
-import numpy as np
 
 from mindx_hnf.api.sink import FeedbackSink, NullSink, RecordingSink
 from mindx_hnf.contracts import BlockType, FeedbackMode
@@ -25,6 +24,51 @@ from mindx_hnf.preprocessing.montage import load_montage
 from mindx_hnf.preprocessing.online import OnlineHemoPipeline
 from mindx_hnf.session.protocol import Block, SessionPlan, SessionScheduler
 
+#: Ground-truth coherence while the dyad is not synchronising (baseline, rest).
+COHERENCE_LOW = 0.1
+#: Ground-truth coherence once a task block's ramp has finished.
+COHERENCE_HIGH = 0.9
+#: Fraction of a feedback block over which the coherence ramps up.
+RAMP_FRACTION = 0.6
+#: Demo mapper gain. Measured through the full pipeline with a 22 s window, the
+#: INS rises only from about 0.08 (coherence 0.1) to 0.17 (coherence 0.9), so a
+#: gain near 1 / 0.09 spreads that span over the game's [0, 1] range. The default
+#: of 2.0 capped the level near 0.17. Real data needs its own calibration.
+DEMO_GAIN = 10.0
+
+
+def coherence_profile(plan: SessionPlan) -> Callable[[float], float]:
+    """Build the synthetic ground-truth coherence over the session timeline.
+
+    Coherence stays low during the baseline and rest blocks, so the mapper
+    measures a genuine resting baseline, and ramps linearly from
+    ``COHERENCE_LOW`` to ``COHERENCE_HIGH`` over the first ``RAMP_FRACTION`` of
+    each feedback block, then holds.
+
+    Args:
+        plan: The session plan whose block timing defines the ramps.
+
+    Returns:
+        A function mapping session time in seconds to coherence in [0, 1].
+    """
+    starts: list[tuple[float, Block]] = []
+    t = 0.0
+    for block in plan.blocks:
+        starts.append((t, block))
+        t += block.duration_s
+
+    def coherence_fn(t_s: float) -> float:
+        for start, block in starts:
+            if start <= t_s < start + block.duration_s:
+                if not block.feedback:
+                    return COHERENCE_LOW
+                ramp_s = max(block.duration_s * RAMP_FRACTION, 1e-9)
+                frac = min(1.0, (t_s - start) / ramp_s)
+                return COHERENCE_LOW + frac * (COHERENCE_HIGH - COHERENCE_LOW)
+        return COHERENCE_LOW
+
+    return coherence_fn
+
 
 def build_demo(
     mode: FeedbackMode = FeedbackMode.REAL,
@@ -34,7 +78,9 @@ def build_demo(
 ):
     """Assemble the synthetic closed loop.
 
-    The ground-truth coherence ramps 0.1 -> 0.9, so feedback should climb.
+    The ground-truth coherence is low in the baseline and ramps up during each
+    task block (``coherence_profile``), so feedback should climb after the
+    baseline.
 
     Args:
         mode: Real or sham feedback for the session.
@@ -51,10 +97,6 @@ def build_demo(
     fs = 7.81
     subjects = ("sub-01", "sub-02")
     n_channels = 20
-
-    # Ground-truth coherence ramps 0.1 -> 0.9 so feedback should climb.
-    def coherence_fn(t: float) -> float:
-        return float(np.clip(0.1 + 0.02 * t, 0.1, 0.9))
 
     # Short blocks for a quick demo; real durations live in configs/.
     scale = 1.0 if not fast else 0.05
@@ -75,7 +117,7 @@ def build_demo(
         n_channels=n_channels,
         fs=fs,
         subjects=subjects,
-        coherence_fn=coherence_fn,
+        coherence_fn=coherence_profile(plan),
         duration_s=duration,
         montage=mont,
     )
@@ -84,7 +126,7 @@ def build_demo(
         subjects, fs, window_s=20.0 * scale + 2, update_every_s=1.0
     )
     sham = ShamProvider([0.3, 0.32, 0.35, 0.31, 0.34] * 50)
-    mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=2.0)
+    mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=DEMO_GAIN)
     if sink is None:
         sink = NullSink()
     scheduler = SessionScheduler(plan)

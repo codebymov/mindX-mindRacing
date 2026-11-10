@@ -82,10 +82,18 @@ at the end of every session, in the same commit as the work.
   package did not compile on 6000.5 (`GetInstanceID` is an error), so it is
   embedded and patched. Added `FeedbackReceiver.Level/TargetSpeed/IsConnected`,
   an optional `CarDriver.LevelSource`, and `FeedbackHud`; wired
-  `TwoCarTest.unity`. **Open:** in the samples taken (~40–55 s into the task
-  block) the level was only ~0.06, so speed went 5.0 → ~5.9 m/s — correct but
-  barely visible. The LSL sink does not record levels, so the full curve was not
-  seen; add a log/CSV sink, then tune mapper gain or window for the demo.
+  `TwoCarTest.unity`. **Level tuning (resolved):** the level sat at ~0.05
+  because of two demo defects, not the estimator. (1) The synthetic coherence
+  ramp (`0.1 + 0.02 t`) hit 0.9 at 40 s, inside the 60 s baseline, so baseline
+  correction removed it; the ramp now follows the session plan
+  (`coherence_profile`: low in baseline/rest, ramps over 60% of each task
+  block). (2) After the pipeline the INS spans only ~0.08 (c=0.1) → ~0.17
+  (c=0.9) at a 22 s window, so gain 2.0 capped the level near 0.17; the demo
+  gain is now 10 (`DEMO_GAIN`). Full-length curve: 0.00 in baseline, ~0.2 at
+  +30 s, ~0.78 at +100 s, back to ~0 in rest, climbs again. Added
+  `simulate --log-csv` (`RecordingSink`, buffered, written on close). Real data
+  needs its own calibration. A 60 s window saturates the estimator (0.71 at
+  c=0.1), so keep ~22–30 s (O3/O4).
   **Placement fixed (same day):** cars had spawned ~12 m up on top of a boundary
   wall (the old spawn probe hit the 15 m `Cube` walls) and `CarDriver` zeroed
   gravity by overwriting the whole velocity. The scaffold now spawns on a

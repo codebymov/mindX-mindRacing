@@ -47,6 +47,10 @@ via Unity Hub):
 
 or *Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All* in the Editor.
 
+Point `-testResults` **outside** `unity/Temp/`: Unity deletes `Temp/` on exit,
+so a results file written there vanishes. Last run (2026-11-10, 2022.3.5f1):
+11/11 passed.
+
 ## Unity assembly layout (why tests can compile without LSL/Ubiq)
 
 | Assembly | Folder | Compiles when |

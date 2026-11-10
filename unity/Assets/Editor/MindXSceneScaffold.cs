@@ -194,9 +194,9 @@ namespace MindXEditor
             }
 
             CreateTestCar(scene, CarBluePrefab, "Car_Player1 (Blue)", start + Vector3.left * 2f,
-                          KeyboardCarInput.Scheme.WASD, new Rect(0f, 0f, 0.5f, 1f), addListener: true);
+                          MindX.KeyboardCarInput.Scheme.WASD, new Rect(0f, 0f, 0.5f, 1f), addListener: true);
             CreateTestCar(scene, CarRedPrefab, "Car_Player2 (Red)", start + Vector3.right * 2f,
-                          KeyboardCarInput.Scheme.Arrows, new Rect(0.5f, 0f, 0.5f, 1f), addListener: false);
+                          MindX.KeyboardCarInput.Scheme.Arrows, new Rect(0.5f, 0f, 0.5f, 1f), addListener: false);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TwoCarTestScene);
@@ -204,7 +204,7 @@ namespace MindXEditor
         }
 
         static void CreateTestCar(Scene scene, string prefabPath, string name, Vector3 pos,
-                                  KeyboardCarInput.Scheme scheme, Rect viewport, bool addListener)
+                                  MindX.KeyboardCarInput.Scheme scheme, Rect viewport, bool addListener)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             GameObject car;

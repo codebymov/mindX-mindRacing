@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mindX slide notes</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11.5pt; line-height: 1.38; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24pt; margin: 0 0 4pt; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 15pt; margin: 0 0 6pt; padding-top: 10pt; border-top: 2px solid #000; }
+  h3 { font-size: 9.5pt; letter-spacing: 1.5px; text-transform: uppercase; margin: 8pt 0 3pt; color: #333; }
+  p { margin: 0 0 4pt; }
+  ul { margin: 0 0 4pt; padding-left: 15pt; }
+  li { margin: 0 0 2pt; }
+  .slide { break-inside: avoid; margin: 0 0 14pt; }
+  .lead { font-size: 12pt; margin-bottom: 12pt; }
+  .note { border: 1px solid #000; padding: 6pt 9pt; margin: 6pt 0; }
+  code { font-family: Consolas, 'Courier New', monospace; font-size: 10pt; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0; }
+  th, td { border-bottom: 1px solid #000; text-align: left; padding: 3pt 5pt; font-size: 10.5pt; vertical-align: top; }
+  th { border-bottom: 2px solid #000; font-size: 9pt; letter-spacing: 1px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<h1>mindX status report: notes per slide</h1>
+<p class="lead">What each slide shows, why it is there, and how the material was made. All brain signals in the demo are synthetic. Nothing here was recorded from people.</p>
+
+<div class="slide"><h2>1. Title</h2>
+<h3>Shows</h3><p>The project title from the START outline and the method: hyperscanning neurofeedback (Hyper-NF) with fNIRS and mixed reality.</p>
+<h3>Say</h3><p>This is a status report from the technical side, with a live demonstration on synthetic data.</p></div>
+
+<div class="slide"><h2>2. Problem statement</h2>
+<h3>Shows</h3><p>The research gap taken from section 1.1 of the outline.</p>
+<ul><li>Interpersonal neural synchrony (INS) is linked to better emotion regulation, but the studies are associative.</li>
+<li>Neurofeedback is usually given on the amplitude of one person's signal.</li>
+<li>The literature search (PRISMA, in preparation) found 9 relevant studies in 120 publications, one of them with fNIRS and only a single dyad.</li></ul>
+<h3>Why</h3><p>It states the question to a clinical audience before any technology: can synchrony be promoted, not only observed.</p></div>
+
+<div class="slide"><h2>3. Hypotheses</h2>
+<h3>Shows</h3><p>Three claims that follow from the outline's aims and key performance indicators.</p>
+<ul><li>H1: regulation success in early versus late sessions, controlled for baseline.</li>
+<li>H2: the effect is larger than with sham feedback, compared within the group (one sham session in three).</li>
+<li>H3: transfer, measured with the exchange game before and after training.</li></ul>
+<p class="note">The wording H1 to H3 is a summary for this talk. The outline defines the aims and indicators, not numbered hypotheses.</p></div>
+
+<div class="slide"><h2>4. Solution approach</h2>
+<h3>Shows</h3><p>The closed loop: measure, compute, feed back, evaluate.</p>
+<ul><li>Measure: two NIRSport2 systems over prefrontal cortex and right TPJ, with short channels for physiological noise.</li>
+<li>Compute: causal online processing and one joint INS value for both participants.</li>
+<li>Feed back: speed and sound pitch of a shared car in mixed reality.</li>
+<li>Evaluate: regulation over sessions, sham control, transfer task.</li></ul>
+<h3>Why</h3><p>One clock (LabStreamingLayer) keeps both participants aligned. Storage is kept off the feedback path so a slow disk can never delay feedback.</p></div>
+
+<div class="slide"><h2>5. Design rationale</h2>
+<h3>Shows</h3><p>Each major choice with its reason, mostly taken from the outline's state of the art.</p>
+<table><tr><th>Choice</th><th>Reason</th></tr>
+<tr><td>fNIRS</td><td>Between EEG and fMRI in resolution, robust to motion artefacts, tolerated by adolescents.</td></tr>
+<tr><td>Joint INS value</td><td>The feedback targets the interaction, not one brain.</td></tr>
+<tr><td>Causal processing</td><td>A correct signal that arrives late is a wrong feedback signal.</td></tr>
+<tr><td>Mixed reality</td><td>Partners see each other, which should help transfer to real social settings.</td></tr>
+<tr><td>Sham from another dyad</td><td>A realistic but unrelated signal controls reward and unrelated training effects.</td></tr></table></div>
+
+<div class="slide"><h2>6. Signal chain</h2>
+<h3>Shows</h3><p>The online steps from raw light intensity to the feedback level, all causal.</p>
+<ul><li>Optical density against a baseline reference that is frozen after the resting block.</li>
+<li>Temporal derivative distribution repair (TDDR) for motion artefacts.</li>
+<li>Regression of the short channels, paired per wavelength, against physiological noise.</li>
+<li>Modified Beer-Lambert law to oxy- and deoxy-haemoglobin (path length factor 6).</li>
+<li>Band-pass, then magnitude-squared coherence in 0.01 to 0.1 Hz over a 22 s sliding window of the channel-averaged HbO of both players, updated every second.</li>
+<li>Baseline mean of the resting block is subtracted, a gain is applied, the value is smoothed and clipped to 0 to 1.</li></ul>
+<h3>How made</h3><p>The Python backend uses MNE-NIRS numerics (extinction tables and the Beer-Lambert operator) built once and applied per frame, and tests compare the causal versions with MNE's offline functions.</p></div>
+
+<div class="slide"><h2>7. The estimator follows injected synchrony</h2>
+<h3>Shows</h3><p>Three measurements on synthetic dyads.</p>
+<ul><li>With the injected coherence raised from 0.1 to 0.9, the INS rises from about 0.08 to 0.17 on the generic path. On the MNE montage path the range is about 0.15 to 0.25.</li>
+<li>A 60 s window saturates (0.71 at coherence 0.1) and loses range, so the demo uses 22 s.</li>
+<li>Mean processing time was about 7 ms per frame, with a maximum near 19 ms.</li>
+<li>More than 110 automated tests: 67 on the backend and 44 or more on the game.</li></ul>
+<h3>How made</h3><p>Offline runs with a virtual clock, 150 s per setting, fixed injected coherence of 0.1, 0.5 and 0.9, comparing INS computed on the raw signal and after the preprocessing chain.</p></div>
+
+<div class="slide"><h2>8. Synthetic fNIRS through the real pipeline</h2>
+<h3>Shows</h3><p>Left: the optode montage seen from above, prefrontal cortex and right TPJ, with one short channel (dashed). Top right: the preprocessed haemoglobin signal of both players over a 310 s session. Bottom right: the joint INS (grey) and the feedback level (green) that sets the car speed. Shaded areas are baseline, task, rest and task.</p>
+<h3>How the data were created</h3>
+<ul><li>A synthetic source emits raw intensities at 7.81 Hz for two subjects: 4 long channels and 1 short channel, 2 wavelengths (760 and 850 nm).</li>
+<li>Each channel is c(t) times a shared slow oscillation (0.05 Hz plus a weaker 0.09 Hz component) plus (1 minus c(t)) times white noise plus independent noise. c(t) is the injected coherence.</li>
+<li>c(t) follows the session plan: 0.1 in baseline and rest, and a ramp from 0.1 to 0.9 over the first 60 percent of each 120 s task block.</li>
+<li>Every long channel also carries per-subject systemic physiology (a slow drift with a 10 s correlation time and a 0.25 Hz respiration component). The short channel carries only that, which is what short-channel regression needs.</li>
+<li>The data go through the real online pipeline (slide 6). The figure is drawn by <code>analysis/make_demo_brain_figure.py</code> with matplotlib.</li></ul>
+<p class="note">Limits. The montage geometry is a schematic stand-in, not a registered head. The synchrony is injected by construction, so the figure shows that the pipeline recovers it, not that real brains synchronise.</p></div>
+
+<div class="slide"><h2>9. Baseline: level zero</h2>
+<h3>Shows</h3><p>One player's view during the first 60 s. The level is 0, both cars drive at the base speed of 5 m/s, and the score panel counts coins at 10 points each.</p>
+<h3>How made</h3><p>Unity 6 scene with a scaled table copy of the track. The Game view was fixed at 1920 by 1080, a frame was saved every 1.5 s during a real five-minute session driven by the backend over LSL, and the frame was cropped to one player's view so the two views do not overlap.</p></div>
+
+<div class="slide"><h2>10. Synchrony rises, the car speeds up</h2>
+<h3>Shows</h3><p>The INS curve (bottom left) has risen in the first task block. Speed follows the level as 5 plus 15 times the level, in metres per second. Coins per minute rose from about 11 to about 27 because a faster car passes more coins.</p>
+<p>The delay of about 30 s is the 5 to 7 s haemodynamic lag plus the 22 s estimation window.</p>
+<p class="note">Difference from the outline. There, items can only be reached while a specific velocity is held. In the demo, coins are collected at any speed and the rate scales with speed. Velocity gating is not implemented yet.</p></div>
+
+<div class="slide"><h2>11. Sham feedback, invisible to players</h2>
+<h3>Shows</h3><p>The operator view (top right) shows the signal source. The orange part of the curve is the sham stretch. Participants never see this overlay.</p>
+<h3>How made</h3><ul><li>The sham trace was recorded from a second synthetic dyad (different random seed, a later and slower synchrony ramp) through the same pipeline, so it is on the same INS scale.</li>
+<li>It replaces the real INS value before the mapping, so the mapping is identical for both sources.</li>
+<li>The operator switches in the backend terminal. The replay stays aligned to task time, so a switch continues the other dyad's trace at the matching point.</li>
+<li>Sham values also rise because the trace is a real trajectory. It controls for reward, not for the level of the signal.</li></ul></div>
+
+<div class="slide"><h2>12. Reward and penalty per player</h2>
+<h3>Shows</h3><p>Late in the session: score, coin count and crashes for the player. Coins add 10 points, a crash subtracts 5 points from both cars. The two cars drive in different lanes, so scores differ by lap length (about 7 percent).</p>
+<h3>How made</h3><ul><li>Each car follows the walls with ray casts and holds its own lane with a slow weave, so the cars take different lines.</li>
+<li>Coins are placed in two lanes, one per player, so one player cannot take the other's coins. An earlier shared lane gave one car twice the coins, which was fixed after measuring where each car collected.</li>
+<li>Over two minutes the cars made no wall contacts.</li></ul></div>
+
+<div class="slide"><h2>13. One signal per player (placeholder)</h2>
+<h3>Shows</h3><p>In a single measured run, each player's own signal gave a different speed.</p>
+<table><tr><th>Player</th><th>Level</th><th>Speed</th><th>Coins per minute</th></tr><tr><td>Player 1</td><td>0.80</td><td>17.1 m/s</td><td>38</td></tr><tr><td>Player 2</td><td>0.39</td><td>10.8 m/s</td><td>22</td></tr></table>
+<h3>How made</h3><p>The placeholder feature is the windowed power of a player's own HbO in 0.01 to 0.1 Hz, with a separate baseline and mapper per player. Player 2 reacts about 12 s later at about 75 percent of the amplitude. The numbers come from one run and are not a statistic.</p>
+<p class="note">This does not decide which per-participant feature the study will use. That choice is still open.</p></div>
+
+<div class="slide"><h2>14. Where we stand, what we need</h2>
+<h3>Shows</h3><p>Left: what the demo already achieves. Right: the outline's key performance indicators that need real participants.</p>
+<ul><li>Obtained: closed loop on synthetic data, causal MNE-NIRS pipeline, sham mechanism, game with reward and penalty, simulated table view.</li>
+<li>To obtain: SUS above 68 percent, PSSUQ of 3 or lower, regulation success early versus late, effect versus sham, transfer success in the exchange game.</li></ul></div>
+
+<div class="slide"><h2>15. What still has to be solved</h2>
+<ul><li>Live NIRSport2 input over LSL with signal quality checks.</li>
+<li>INS window and estimator: stability against latency (open questions on window length and on wavelet coherence).</li>
+<li>A feature for Individual mode, per participant.</li>
+<li>Reward design with items reachable only at a held velocity, as in the outline.</li>
+<li>Co-located multiplayer in XR on the real headset. The table view in the demo is a simulation without passthrough.</li></ul></div>
+
+<div class="slide"><h2>16. From synthetic to two people live</h2>
+<table><tr><th>Step</th><th>Content</th><th>Time</th></tr>
+<tr><td>Level B</td><td>One person, live fNIRS</td><td>2 to 4 weeks, needs hardware</td></tr>
+<tr><td>Level C</td><td>Two people, live and co-located</td><td>1 to 2 months or more</td></tr>
+<tr><td>Study</td><td>Three sessions per dyad, one with sham, transfer task</td><td>After ethics approval</td></tr>
+<tr><td>Analysis</td><td>Bayesian models, open source toolbox</td><td>Work package 5</td></tr></table></div>
+
+<h2>Sources</h2>
+<ul><li>mindX project outline (START programme), sections 1.1, 2.1, 2.2.</li>
+<li>Project repository: backend tests, <code>docs/DEMO_RUNBOOK.md</code>, <code>analysis/make_demo_brain_figure.py</code>.</li>
+<li>Numbers: offline virtual-clock runs and live sessions on one machine, all with synthetic data.</li></ul>
+
+</body>
+</html>

@@ -2,172 +2,234 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>mindX demo slides</title>
+<title>mindX status report</title>
 <style>
-  /* Plain black and white. Colour appears only in screenshots and figures. */
+  /* Black and white. Colour appears only inside screenshots and figures. No footers. */
   @page { size: 1280px 720px; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
   body { font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .s { width: 1280px; height: 720px; padding: 56px 72px 64px; position: relative; overflow: hidden;
-       page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .s { width: 1280px; height: 720px; padding: 60px 80px; overflow: hidden; display: flex; flex-direction: column;
+       page-break-after: always; break-after: page; }
   .s:last-child { page-break-after: auto; break-after: auto; }
-  h1 { font-size: 112px; line-height: 1; margin: 0; font-weight: 700; }
-  h2 { font-size: 46px; line-height: 1.1; margin: 0 0 18px; font-weight: 700; padding-bottom: 14px; border-bottom: 3px solid #000; }
+  .tag { font-size: 22px; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 14px; color: #444; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 60px; line-height: 1.12; margin: 0; font-weight: 700; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 50px; line-height: 1.1; margin: 0 0 26px; font-weight: 700; }
   h3 { font-size: 30px; margin: 0 0 8px; }
-  p, li { font-size: 28px; line-height: 1.35; margin: 0; }
-  ul { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 14px; }
-  .sub { font-size: 40px; margin-top: 16px; }
-  .small { font-size: 20px; color: #444; }
-  .foot { position: absolute; left: 72px; bottom: 24px; font-size: 18px; color: #444; }
-  .num { position: absolute; right: 72px; bottom: 24px; font-size: 18px; color: #444; }
-  .row { display: flex; gap: 36px; align-items: flex-start; }
+  p, li { font-size: 32px; line-height: 1.32; margin: 0; }
+  ul { margin: 0; padding-left: 34px; display: flex; flex-direction: column; gap: 16px; }
+  .rule { border: 0; border-top: 3px solid #000; margin: 0 0 26px; width: 160px; }
+  .row { display: flex; gap: 48px; align-items: flex-start; flex: 1; min-height: 0; }
   .grow { flex: 1; min-width: 0; }
-  .box { border: 2px solid #000; padding: 18px 20px; }
-  .boxes { display: flex; align-items: stretch; gap: 10px; margin-top: 18px; }
-  .boxes .box { flex: 1; min-width: 0; }
-  .boxes .arrow { align-self: center; font-size: 36px; }
-  .boxes p { font-size: 22px; }
-  .big { font-size: 96px; font-weight: 700; line-height: 1; }
   .shot { display: block; border: 1px solid #000; }
-  a { color: #000; }
+  .box { border: 2px solid #000; padding: 20px 24px; }
+  .flow { display: flex; align-items: stretch; gap: 0; }
+  .flow .box { flex: 1; min-width: 0; }
+  .flow .link { width: 34px; align-self: center; border-top: 3px solid #000; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid #000; font-size: 28px; line-height: 1.28; }
+  th { font-size: 22px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 3px solid #000; }
+  .num { white-space: nowrap; font-size: 56px; font-weight: 700; line-height: 1; font-family: Georgia, serif; }
+  .cols { display: flex; gap: 32px; }
+  .cols > div { flex: 1; min-width: 0; }
+  .small { font-size: 24px; color: #444; }
   .center { justify-content: center; }
-  .three { display: flex; gap: 24px; margin-top: 24px; }
-  .three .box { flex: 1; min-width: 0; }
-  .two { display: flex; gap: 28px; margin-top: 20px; }
-  .two .box { flex: 1; min-width: 0; }
 </style>
 </head>
 <body>
 
+<!-- 1 Title -->
 <section class="s center">
-  <p class="small">START programme · multiuser XR neuromodulation</p>
-  <h1 style="margin-top:20px">mindX</h1>
-  <p class="sub">Neurofeedback for two</p>
-  <p style="margin-top:28px;width:900px">Two brains, one shared signal, fed back as speed in a cooperative race.</p>
-  <p class="foot">Demo with synthetic data · 15 minutes</p>
+  <p class="tag">mindX · START programme</p>
+  <h1>Technical foundations for multiuser XR enhanced neuromodulation in digital healthcare</h1>
+  <hr class="rule" style="margin-top:34px">
+  <p style="font-size:36px">Hyperscanning neurofeedback with fNIRS and mixed reality</p>
+  <p class="small" style="margin-top:14px;font-size:26px">Status report with a demonstration on synthetic data</p>
 </section>
 
-<section class="s center">
-  <h1 style="font-size:84px;line-height:1.08;width:1050px">Can two people learn to synchronise their brains?</h1>
-  <p class="sub" style="margin-top:36px">Does it carry over to cooperation?</p>
-  <p class="num">2</p>
-</section>
-
+<!-- 2 Problem -->
 <section class="s">
-  <h2>From two heads to one car</h2>
-  <div class="boxes">
-    <div class="box"><h3>Record</h3><p>Two fNIRS caps, one LSL clock</p></div>
-    <div class="arrow">→</div>
-    <div class="box"><h3>Clean</h3><p>Causal MNE-NIRS pipeline</p></div>
-    <div class="arrow">→</div>
-    <div class="box"><h3>Compare</h3><p>Joint synchrony, 22 s window</p></div>
-    <div class="arrow">→</div>
-    <div class="box"><h3>Feed back</h3><p>Level 0–1. Speed = 5 + 15 × level</p></div>
-    <div class="arrow">→</div>
-    <div class="box"><h3>Play</h3><p>Cars, coins, scores</p></div>
-  </div>
-  <p style="margin-top:36px;width:1000px">Causal and soft real-time. About 7 ms of processing per frame.</p>
-  <p class="num">3</p>
-</section>
-
-<section class="s">
-  <h2>fNIRS is slow</h2>
-  <div class="three">
-    <div class="box"><p class="big">5–7 s</p><p>haemodynamic lag</p></div>
-    <div class="box"><p class="big">22 s</p><p>window the estimate needs</p></div>
-    <div class="box"><p class="big">~30 s</p><p>until the car reacts</p></div>
-  </div>
-  <p style="margin-top:36px">Physiology, not a bug. The demo ramp is sped up.</p>
-  <p class="num">4</p>
-</section>
-
-<section class="s">
-  <h2>Baseline: level zero</h2>
-  <div class="row">
-    <img class="shot" src="key_baseline.jpg" width="800" height="450" alt="Two player views at level zero">
-    <ul class="grow"><li>Level 0, speed 5 m/s</li><li>One view per player</li><li>Own score in each view</li><li>10 points per coin</li></ul>
-  </div>
-  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">5</p>
-</section>
-
-<section class="s">
-  <h2>The signal rises, the car follows</h2>
-  <div class="row">
-    <img class="shot" src="key_rising.jpg" width="800" height="450" alt="Synchrony curve rising, scores growing">
-    <ul class="grow"><li>Speed 5 to 17 m/s</li><li>Coins per minute: 11 to 27</li><li>Delay about 30 s</li><li>TEAM total on top</li></ul>
-  </div>
-  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">6</p>
-</section>
-
-<section class="s">
-  <h2>Sham: another dyad's recording</h2>
-  <div class="row">
-    <img class="shot" src="key_sham.jpg" width="800" height="450" alt="Operator view showing Source SHAM">
-    <ul class="grow"><li>Same mapping, other source</li><li>Players cannot tell</li><li>Orange: operator view only</li><li>It also rises: real trajectory</li></ul>
-  </div>
-  <p class="foot">Operator view · participants never see this</p><p class="num">7</p>
-</section>
-
-<section class="s">
-  <h2>What the sensors see (synthetic)</h2>
-  <img class="shot" src="brain_synthetic.png" width="1000" height="503" alt="Montage, both players' haemoglobin signals, synchrony and feedback level" style="margin:0 auto">
-  <p class="foot">Synthetic data · the processing code is the real pipeline</p><p class="num">8</p>
-</section>
-
-<section class="s">
-  <h2>Two players, two scores</h2>
-  <div class="row">
-    <img class="shot" src="key_second.jpg" width="800" height="450" alt="Late in the session: scores, one crash each, team total">
-    <ul class="grow"><li>+10 per coin, own lane</li><li>−5 each on a crash</li><li>Scores differ by about 7%</li><li>Same signal, same speed</li></ul>
-  </div>
-  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">9</p>
-</section>
-
-<section class="s">
-  <h2>The whole session in 19 seconds</h2>
-  <div class="row" style="gap:24px;margin-top:8px">
-    <figure style="margin:0"><img class="shot" src="key_baseline.jpg" width="366" height="206" alt="Baseline"><p class="small" style="margin-top:6px">baseline</p></figure>
-    <figure style="margin:0"><img class="shot" src="key_rising.jpg" width="366" height="206" alt="Rising"><p class="small" style="margin-top:6px">signal rising</p></figure>
-    <figure style="margin:0"><img class="shot" src="key_second.jpg" width="366" height="206" alt="Second peak"><p class="small" style="margin-top:6px">second peak</p></figure>
-  </div>
-  <ul style="margin-top:30px">
-    <li>5 minutes of play, shown at about 18× speed</li>
-    <li>Video file: <a href="session_timelapse.mp4">session_timelapse.mp4</a></li>
-    <li>Same clip as a GIF: <a href="session_timelapse.gif">session_timelapse.gif</a></li>
+  <p class="tag">Problem statement</p>
+  <h2>Social synchrony is measurable, but not yet trainable</h2>
+  <ul>
+    <li>Social interaction shapes brain development and mental health</li>
+    <li>Interpersonal neural synchrony (INS) is only associated with outcomes, not shown to be causal</li>
+    <li>Neurofeedback trains one person's signal amplitude</li>
+    <li>Hyper-NF is nascent: 9 of 120 studies, one fNIRS study, a single dyad</li>
   </ul>
-  <p class="foot">Fallback if the live run fails</p><p class="num">10</p>
 </section>
 
+<!-- 3 Hypotheses -->
 <section class="s">
-  <h2>AR on the table, simulated</h2>
-  <div class="boxes" style="margin-top:28px">
-    <div class="box"><h3>Game world</h3><p>Full size, in metres. Physics, coins and scores run here.</p></div>
-    <div class="arrow">→</div>
-    <div class="box"><h3>Table copy</h3><p>Scaled by 0.0075. Visual only. One view per player.</p></div>
-  </div>
-  <p style="margin-top:36px">Passthrough and anchoring arrive with the headset.</p>
-  <p class="num">11</p>
+  <p class="tag">Hypotheses</p>
+  <h2>Three testable claims</h2>
+  <table>
+    <tr><th style="width:90px">ID</th><th>Claim</th><th style="width:400px">Evidence</th></tr>
+    <tr><td>H1</td><td>Dyads raise INS with joint feedback</td><td>Early versus late sessions, controlled for baseline</td></tr>
+    <tr><td>H2</td><td>The effect exceeds sham feedback</td><td>Within group, one sham session in three</td></tr>
+    <tr><td>H3</td><td>Cooperation transfers without feedback</td><td>Exchange game, pre versus post</td></tr>
+  </table>
 </section>
 
+<!-- 4 Approach -->
 <section class="s">
-  <h2>Real code, synthetic data</h2>
-  <div class="two">
-    <div class="box"><h3>Synthetic</h3><ul><li>fNIRS of both players</li><li>Shared 0.05 Hz component</li><li>The sham partner</li><li>The AR table view</li></ul></div>
-    <div class="box"><h3>Real</h3><ul><li>MNE-NIRS online pipeline</li><li>Causal coherence estimate</li><li>LSL into the game</li><li>Coins, scores, penalty</li><li>Automated tests</li></ul></div>
+  <p class="tag">Solution approach</p>
+  <h2>A closed loop around the dyad</h2>
+  <div class="flow">
+    <div class="box"><h3>Measure</h3><p style="font-size:26px">Two NIRSport2 systems, PFC and right TPJ, short channels</p></div>
+    <div class="link"></div>
+    <div class="box"><h3>Compute</h3><p style="font-size:26px">Causal online processing and one joint INS value</p></div>
+    <div class="link"></div>
+    <div class="box"><h3>Feed back</h3><p style="font-size:26px">Speed and pitch of a shared car in mixed reality</p></div>
+    <div class="link"></div>
+    <div class="box"><h3>Evaluate</h3><p style="font-size:26px">Regulation, sham control, transfer task</p></div>
   </div>
-  <p class="num">12</p>
+  <p style="margin-top:40px">All streams share one LSL clock. Storage runs off the feedback path.</p>
 </section>
 
+<!-- 5 Rationale -->
 <section class="s">
-  <h2>Next steps</h2>
-  <div class="three">
-    <div class="box"><h3>Level B</h3><p>One person, live fNIRS</p><p class="small" style="margin-top:8px">2–4 weeks. Needs hardware.</p></div>
-    <div class="box"><h3>Level C</h3><p>Two people, live</p><p class="small" style="margin-top:8px">1–2+ months.</p></div>
-    <div class="box"><h3>Open</h3><p>Per-player feature (O7)</p><p>XR rig on XRI 3</p><p>Varjo XR-4</p></div>
+  <p class="tag">Design rationale</p>
+  <h2>Why these choices</h2>
+  <table>
+    <tr><th style="width:330px">Choice</th><th>Reason</th></tr>
+    <tr><td>fNIRS</td><td>Better localisation than EEG, tolerates motion, suits adolescents</td></tr>
+    <tr><td>Joint INS value</td><td>Targets the social process itself, not one brain</td></tr>
+    <tr><td>Causal processing</td><td>No future samples, so feedback is never late</td></tr>
+    <tr><td>Mixed reality</td><td>Partners see each other, which favours transfer</td></tr>
+    <tr><td>Sham from another dyad</td><td>Controls reward and unrelated training effects</td></tr>
+  </table>
+</section>
+
+<!-- 6 Signal chain -->
+<section class="s">
+  <p class="tag">Signal chain</p>
+  <h2>From photons to a feedback level</h2>
+  <div class="flow" style="flex-wrap:wrap;row-gap:22px">
+    <div class="box" style="flex:0 0 280px"><h3>Optical density</h3><p class="small">Baseline reference</p></div>
+    <div class="link"></div>
+    <div class="box" style="flex:0 0 280px"><h3>TDDR</h3><p class="small">Motion correction</p></div>
+    <div class="link"></div>
+    <div class="box" style="flex:0 0 280px"><h3>Short channels</h3><p class="small">Physiology regression</p></div>
+    <div class="link" style="visibility:hidden"></div>
+    <div class="box" style="flex:0 0 280px"><h3>Beer-Lambert</h3><p class="small">HbO and HbR</p></div>
+    <div class="link"></div>
+    <div class="box" style="flex:0 0 280px"><h3>Coherence</h3><p class="small">0.01 to 0.1 Hz, 22 s</p></div>
+    <div class="link"></div>
+    <div class="box" style="flex:0 0 280px"><h3>Level 0 to 1</h3><p class="small">Baseline corrected</p></div>
   </div>
-  <p style="font-size:56px;font-weight:700;margin-top:44px">Questions?</p>
-  <p class="num">13</p>
+  <p style="margin-top:34px">Implemented with MNE-NIRS, causal at every step.</p>
+</section>
+
+<!-- 7 Estimator validation -->
+<section class="s">
+  <p class="tag">Results so far</p>
+  <h2>The estimator follows injected synchrony</h2>
+  <div class="cols">
+    <div><p class="num">0.08 to 0.17</p><p class="small" style="margin-top:8px">INS when injected coherence rises from 0.1 to 0.9</p></div>
+    <div><p class="num">22 s</p><p class="small" style="margin-top:8px">window: a 60 s window saturates and loses range</p></div>
+    <div><p class="num">7 ms</p><p class="small" style="margin-top:8px">mean processing time per frame</p></div>
+  </div>
+  <ul style="margin-top:44px">
+    <li>Monotonic response on synthetic dyads, with and without the MNE montage</li>
+    <li>More than 110 automated tests on backend and game</li>
+  </ul>
+</section>
+
+<!-- 8 Synthetic figure -->
+<section class="s" style="padding-top:44px;padding-bottom:40px">
+  <h2 style="font-size:42px;margin-bottom:16px">Synthetic fNIRS through the real pipeline</h2>
+  <img class="shot" src="brain_synthetic.png" width="1000" height="504" alt="Montage, haemoglobin signals of both players, synchrony and feedback level" style="margin:0 auto">
+</section>
+
+<!-- 9 Baseline -->
+<section class="s">
+  <p class="tag">Results so far · game</p>
+  <h2 style="margin-bottom:18px">Baseline: level zero</h2>
+  <div class="row">
+    <img class="shot" src="view_baseline.jpg" height="470" width="439" alt="Player view at level zero">
+    <ul class="grow" style="margin-top:20px"><li>Speed stays at 5 m/s</li><li>Own score in each player's view</li><li>Coins pay 10 points</li></ul>
+  </div>
+</section>
+
+<!-- 10 Rising -->
+<section class="s">
+  <p class="tag">Results so far · game</p>
+  <h2 style="margin-bottom:18px">Synchrony rises, the car speeds up</h2>
+  <div class="row">
+    <img class="shot" src="view_rising.jpg" height="470" width="439" alt="Player view while the synchrony curve rises">
+    <ul class="grow" style="margin-top:20px"><li>Speed from 5 to 17 m/s</li><li>Coins per minute from 11 to 27</li><li>Delay of about 30 s, set by physiology</li></ul>
+  </div>
+</section>
+
+<!-- 11 Sham -->
+<section class="s">
+  <p class="tag">Results so far · control</p>
+  <h2 style="margin-bottom:18px">Sham feedback, invisible to players</h2>
+  <div class="row">
+    <img class="shot" src="view_sham.jpg" height="470" width="439" alt="Operator view showing the source SHAM">
+    <ul class="grow" style="margin-top:20px"><li>Another dyad's recording, same mapping</li><li>Operator switch, no visible change</li><li>The sham trace also rises: it is a real trajectory</li></ul>
+  </div>
+</section>
+
+<!-- 12 Scores -->
+<section class="s">
+  <p class="tag">Results so far · behaviour</p>
+  <h2 style="margin-bottom:18px">Reward and penalty per player</h2>
+  <div class="row">
+    <img class="shot" src="view_scores.jpg" height="470" width="439" alt="Player view with score, coins and crashes late in the session">
+    <ul class="grow" style="margin-top:20px"><li>Plus 10 per coin in the player's own lane</li><li>Minus 5 for both cars on a crash</li><li>Scores differ by lap length, about 7%</li></ul>
+  </div>
+</section>
+
+<!-- 13 Individual mode -->
+<section class="s">
+  <p class="tag">Results so far · placeholder</p>
+  <h2>One signal per player</h2>
+  <table>
+    <tr><th>Player</th><th>Level</th><th>Speed</th><th>Coins per minute</th></tr>
+    <tr><td>Player 1</td><td>0.80</td><td>17.1 m/s</td><td>38</td></tr>
+    <tr><td>Player 2</td><td>0.39</td><td>10.8 m/s</td><td>22</td></tr>
+  </table>
+  <p class="small" style="margin-top:28px">Demo placeholder feature: own HbO band power. It does not settle the open choice of a per-participant feature.</p>
+</section>
+
+<!-- 14 Obtained vs targets -->
+<section class="s">
+  <p class="tag">Results and targets</p>
+  <h2>Where we stand, what we need</h2>
+  <div class="cols">
+    <div class="box"><h3>Obtained</h3>
+      <ul style="font-size:26px;gap:10px"><li style="font-size:26px">Closed loop, end to end</li><li style="font-size:26px">Causal MNE-NIRS pipeline</li><li style="font-size:26px">Sham mechanism</li><li style="font-size:26px">Game with reward and penalty</li><li style="font-size:26px">Simulated table view</li></ul></div>
+    <div class="box"><h3>To obtain</h3>
+      <ul style="font-size:26px;gap:10px"><li style="font-size:26px">SUS above 68 percent</li><li style="font-size:26px">PSSUQ of 3 or lower</li><li style="font-size:26px">Regulation: early versus late session</li><li style="font-size:26px">Effect versus sham</li><li style="font-size:26px">Transfer in the exchange game</li></ul></div>
+  </div>
+</section>
+
+<!-- 15 Challenges -->
+<section class="s">
+  <p class="tag">Challenges</p>
+  <h2>What still has to be solved</h2>
+  <ul>
+    <li>Live NIRSport2 input over LSL with signal quality checks</li>
+    <li>INS window and estimator: stability against latency</li>
+    <li>A per-participant feature for Individual mode</li>
+    <li>Reward design: items reachable only at a held velocity</li>
+    <li>Co-located multiplayer XR on the real headset</li>
+  </ul>
+</section>
+
+<!-- 16 Outlook -->
+<section class="s">
+  <p class="tag">Outlook</p>
+  <h2>From synthetic to two people live</h2>
+  <table>
+    <tr><th style="width:230px">Step</th><th>Content</th><th style="width:230px">Time</th></tr>
+    <tr><td>Level B</td><td>One person, live fNIRS</td><td>2 to 4 weeks</td></tr>
+    <tr><td>Level C</td><td>Two people, live and co-located</td><td>1 to 2 months or more</td></tr>
+    <tr><td>Study</td><td>Three sessions, one sham, transfer task</td><td>After ethics approval</td></tr>
+    <tr><td>Analysis</td><td>Bayesian models, open source toolbox</td><td>WP5</td></tr>
+  </table>
 </section>
 
 </body>

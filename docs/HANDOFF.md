@@ -182,6 +182,14 @@ at the end of every session, in the same commit as the work.
   the INS/level (labelled SYNTHETIC) into `docs/demo/brain_synthetic.png`;
   `analysis/make_demo_gif.py` + `DemoFrameRecorder` build the time-lapse GIF
   (no ffmpeg on this machine). Tests now: backend 60, Unity 44.
+  **Demo materials:** `docs/DEMO_RUNBOOK.md` (bullets only, black and white) with
+  screenshots and a time-lapse GIF in `docs/demo/`; a styled version was published
+  as a private Claude artifact (link given in the session). Slides come next (web
+  deck, 15 min). **Waiting on a human decision:** (a) Individual mode / O7 — the
+  per-player feature that would let the two cars have different speeds; (b) whether
+  to install ffmpeg for an MP4; (c) the XR rig migration to XRI 3. Phone approvals
+  need Remote Control enabled by the user (`/remote-control` in the session); the
+  PushNotification tool only reaches the terminal until then.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

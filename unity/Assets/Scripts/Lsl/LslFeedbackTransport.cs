@@ -75,20 +75,23 @@ namespace MindX
 
         public bool TryGetLatest(out FeedbackSample sample)
         {
-            bool gotNew = false;
+            // One sample per call (0.0 timeout = non-blocking; pull_sample returns the
+            // sample's LSL timestamp, 0.0 == none). The caller loops until false, so each
+            // receiver sees every sample, including its own in Individual mode, where
+            // one sample per subject is interleaved on the same stream.
             if (_inlet != null)
             {
-                // 0.0 timeout = non-blocking; loop drains the buffer to the newest.
-                // pull_sample returns the sample's LSL timestamp (0.0 == none).
-                double ts;
-                while ((ts = _inlet.pull_sample(_buf, 0.0)) != 0.0)
+                double ts = _inlet.pull_sample(_buf, 0.0);
+                if (ts != 0.0)
                 {
                     _latest = FeedbackWire.Decode(_buf, ts, _subjectIds);
-                    gotNew = true;
+                    sample = _latest;
+                    return true;
                 }
             }
+
             sample = _latest;
-            return gotNew;
+            return false;
         }
 
         public void Close()

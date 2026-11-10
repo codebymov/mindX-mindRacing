@@ -148,6 +148,26 @@ namespace MindX.Tests
         }
 
         [Test]
+        public void InterleavedIndividualSamplesEachReachTheirOwnCar()
+        {
+            // One sample per subject per tick on the same stream, subject 1 last: a receiver
+            // that kept only the newest sample would never see subject 0's.
+            var car0 = MakeCar(0);
+            var car1 = MakeCar(1);
+            foreach (var car in new[] { car0, car1 })
+            {
+                car.Transport.Push(Sample(0.2f, "real", 0));
+                car.Transport.Push(Sample(0.9f, "real", 1));
+            }
+
+            Tick(car0.Receiver);
+            Tick(car1.Receiver);
+
+            Assert.That(car0.Receiver.Level, Is.EqualTo(0.2f).Within(1e-5f));
+            Assert.That(car1.Receiver.Level, Is.EqualTo(0.9f).Within(1e-5f));
+        }
+
+        [Test]
         public void UnroutableSampleDrivesNoCar()
         {
             var car = MakeCar(0);

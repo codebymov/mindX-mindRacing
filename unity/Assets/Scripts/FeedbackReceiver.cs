@@ -119,7 +119,9 @@ namespace MindX
         // perceive a difference. Sham must be indistinguishable from real.
         void Update()
         {
-            if (_transport != null && _transport.TryGetLatest(out var s))
+            // Drain every pending sample: with one sample per subject per tick (Individual
+            // mode) the newest sample alone may belong to the other car.
+            while (_transport != null && _transport.TryGetLatest(out var s))
             {
                 // Route: shared (Hyperscanning) sample drives every car; an
                 // Individual sample drives only its owning car.

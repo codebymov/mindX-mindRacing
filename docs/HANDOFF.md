@@ -13,7 +13,7 @@ at the end of every session, in the same commit as the work.
 | Backend real-time loop | Works end-to-end on synthetic data (`simulate`, `simulate --montage configs/montage_demo.yaml`, `simulate --lsl`). |
 | MNE online (D10) | Phase 1 (MBLL) + Phase 2 (baseline-frozen OD, causal TDDR, wavelength-paired short-channel regression) **done**, each tested against MNE/MNE-NIRS. See `docs/MNE_ONLINE_SCOPE.md`. |
 | Backend → Unity transport (D9) | LSL. Wire format = `contracts/feedback_wire.json`, tested from both languages. |
-| Unity | Scripts split into `MindX.Runtime` + optional `MindX.Lsl` / `MindX.Ubiq` + `MindX.Tests.EditMode`. **Compile-checked** with Unity's Roslyn, **never run in the Editor yet**. LSL4Unity and Ubiq are **not installed** in the project. |
+| Unity (branch `unity6-mcp`, worktree `MindX-unity6`, Unity 6000.5.1f1) | Unity MCP works (`Unity_RunCommand`, `Unity_GetConsoleLogs`). **LSL4Unity v1.16.0 is embedded** in `unity/Packages/com.labstreaminglayer.lsl4unity` with a one-line Unity 6.5 patch (`BaseOutlet.cs`: `GetInstanceID` → `GetEntityId`); `MindX.Lsl` compiles. **Level A on desktop works**: `Assets/Scenes/TwoCarTest.unity` (WASD/arrows steer, speed = base + bonus × LSL level) verified against `simulate --lsl --full`: both cars connected, level rose from 0 after the baseline block. Ubiq not installed. |
 | Multiplayer O5 (Ubiq, D11/D12) | Scaffolded only; Ubiq scripts never compiled against Ubiq. |
 | Tests | Python: 48 pass, 0 skipped. C# EditMode: 11 tests, written + compiled, not executed. See `docs/TESTING.md`. |
 | CI | `.github/workflows/backend.yml` (Linux + Windows, Py 3.11/3.13). No Unity CI. |
@@ -76,6 +76,24 @@ at the end of every session, in the same commit as the work.
 - `backend/.venv/Lib/site-packages/~umpy`: leftover pip temp dir, safe to delete.
 
 ## Session log
+
+- **2026-11-10** — Unity 6 + MCP → desktop Level A (branch `unity6-mcp`).
+  MCP confirmed working after the AI terms were accepted. The LSL4Unity git
+  package did not compile on 6000.5 (`GetInstanceID` is an error), so it is
+  embedded and patched. Added `FeedbackReceiver.Level/TargetSpeed/IsConnected`,
+  an optional `CarDriver.LevelSource`, and `FeedbackHud`; wired
+  `TwoCarTest.unity`. **Open:** in the samples taken (~40–55 s into the task
+  block) the level was only ~0.06, so speed went 5.0 → ~5.9 m/s — correct but
+  barely visible. The LSL sink does not record levels, so the full curve was not
+  seen; add a log/CSV sink, then tune mapper gain or window for the demo.
+  Cars have no steering input unless a key is held, so they drive off the ring.
+  The Unity 6 API updater changed `velocity` → `linearVelocity`
+  (`CarController`, `XRCarController`, `CarDriver`): this branch must not merge
+  to `main` (2022.3) as-is. Still broken: XR rig prefab (XRI 3 migration),
+  `Road (2)` missing prefab; the console shows 5 missing-script warnings from
+  XR settings. Start the backend with
+  `backend/.venv/Scripts/python.exe -m mindx_hnf.scripts.simulate --lsl --full`
+  (~5 min; default run lasts only ~17 s).
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

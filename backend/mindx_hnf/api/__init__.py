@@ -6,6 +6,6 @@ neural streams. The `FeedbackSink` protocol abstracts the transport so tests and
 simulation use `NullSink` and the live game uses `LSLOutletSink`.
 """
 
-from mindx_hnf.api.sink import FeedbackSink, LSLOutletSink, NullSink
+from mindx_hnf.api.sink import FeedbackSink, LSLOutletSink, NullSink, RecordingSink
 
-__all__ = ["FeedbackSink", "LSLOutletSink", "NullSink"]
+__all__ = ["FeedbackSink", "LSLOutletSink", "NullSink", "RecordingSink"]

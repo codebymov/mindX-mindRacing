@@ -15,7 +15,9 @@ Attributes:
 
 from __future__ import annotations
 
+import csv
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Protocol
 
 from mindx_hnf.contracts import (
@@ -121,6 +123,82 @@ class NullSink:
 
     def close(self) -> None:
         """Do nothing; there is no transport to release."""
+
+
+class RecordingSink:
+    """Wraps another sink and records every sample for offline inspection.
+
+    The hot path only appends to an in-memory list. The CSV file (persistence
+    track) is written once, when the loop closes the sink, so recording never
+    adds disk I/O to the feedback loop.
+
+    Attributes:
+        published: Every sample passed to ``publish``, in order.
+    """
+
+    #: CSV column order.
+    COLUMNS: tuple[str, ...] = (
+        "t_lsl",
+        "level",
+        "raw_ins",
+        "mode",
+        "session_mode",
+        "subject",
+    )
+
+    def __init__(
+        self, inner: FeedbackSink | None = None, csv_path: Path | str | None = None
+    ) -> None:
+        """Create a recording wrapper.
+
+        Args:
+            inner: Sink that actually delivers the samples (for example the LSL
+                outlet). None records only.
+            csv_path: File written on ``close``; None disables the file.
+        """
+        self._inner = inner
+        self._csv_path = Path(csv_path) if csv_path is not None else None
+        self.published: list[FeedbackSample] = []
+
+    def publish(self, sample: FeedbackSample) -> None:
+        """Record the sample, then forward it unchanged.
+
+        Args:
+            sample: The feedback sample to record and deliver.
+        """
+        self.published.append(sample)
+        if self._inner is not None:
+            self._inner.publish(sample)
+
+    def write_csv(self, path: Path | str) -> None:
+        """Write the recorded samples as CSV with LF line endings.
+
+        Args:
+            path: Destination file; parent directories are created.
+        """
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle, lineterminator="\n")
+            writer.writerow(self.COLUMNS)
+            for s in self.published:
+                writer.writerow(
+                    [
+                        f"{s.t_lsl:.6f}",
+                        f"{s.level:.6f}",
+                        f"{s.raw_ins:.6f}",
+                        s.mode.value,
+                        s.session_mode.value,
+                        s.subject or "",
+                    ]
+                )
+
+    def close(self) -> None:
+        """Write the CSV (if configured) and close the wrapped sink."""
+        if self._csv_path is not None:
+            self.write_csv(self._csv_path)
+        if self._inner is not None:
+            self._inner.close()
 
 
 class LSLOutletSink:  # pragma: no cover - needs pylsl

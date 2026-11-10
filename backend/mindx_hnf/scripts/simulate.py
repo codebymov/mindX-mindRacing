@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from mindx_hnf.api.sink import FeedbackSink, NullSink
+from mindx_hnf.api.sink import FeedbackSink, NullSink, RecordingSink
 from mindx_hnf.contracts import BlockType, FeedbackMode
 from mindx_hnf.feedback.mapper import BaselineSmoothingMapper, ShamProvider
 from mindx_hnf.ins.coherence import WaveletCoherenceINS
@@ -118,6 +118,13 @@ def main() -> None:
         help="optode montage YAML (e.g. configs/montage_demo.yaml): run the full "
         "MNE preprocessing path on wavelength-paired synthetic data (D10).",
     )
+    parser.add_argument(
+        "--log-csv",
+        type=Path,
+        default=None,
+        help="write every feedback sample (t_lsl, level, raw_ins, ...) to this CSV "
+        "when the run ends; works with or without --lsl.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -136,10 +143,14 @@ def main() -> None:
             "Publishing feedback on LSL stream 'mindx_feedback' — "
             "connect Unity (LslFeedbackTransport) now."
         )
+    if args.log_csv is not None:
+        sink = RecordingSink(sink, args.log_csv)
     orch, sink = build_demo(
         mode=mode, fast=not args.full, sink=sink, montage=args.montage
     )
     stats = orch.run()
+    if args.log_csv is not None:
+        print(f"feedback samples written to {args.log_csv}")
 
     levels = [s.level for s in getattr(sink, "published", [])]
     print(f"\nmode={mode.value}")

@@ -18,6 +18,9 @@ namespace MindX
         [SerializeField] private float spinDegreesPerSecond = 180f;
         [SerializeField] private float bobHeight = 0.15f;
 
+        private readonly System.Collections.Generic.Dictionary<string, int> _collectedBy =
+            new System.Collections.Generic.Dictionary<string, int>();
+
         private Renderer[] _renderers;
         private Collider _collider;
         private Vector3 _basePosition;
@@ -27,6 +30,12 @@ namespace MindX
         /// Gets a value indicating whether the coin can be collected.
         /// </summary>
         public bool Available { get; private set; } = true;
+
+        /// <summary>
+        /// Gets how many times each player has collected this coin, keyed by player name.
+        /// Diagnostic: shows whether the lanes give the players an equal chance.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyDictionary<string, int> CollectedBy => _collectedBy;
 
         /// <summary>
         /// Collects the coin for a car if it is available.
@@ -42,6 +51,8 @@ namespace MindX
             }
 
             collector.RegisterCoin(now);
+            _collectedBy.TryGetValue(collector.PlayerName, out int times);
+            _collectedBy[collector.PlayerName] = times + 1;
             Available = false;
             _collectedAt = now;
             SetVisible(false);

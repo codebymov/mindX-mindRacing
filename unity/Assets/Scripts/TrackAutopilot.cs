@@ -50,12 +50,22 @@ namespace MindX
         [Tooltip("Angle in degrees of the two forward-diagonal rays.")]
         [SerializeField] private float diagonalAngle = 35f;
 
+        private readonly System.Collections.Generic.List<Vector3> _wallHitPositions =
+            new System.Collections.Generic.List<Vector3>();
+
         private float _steer;
+        private float _sumLateral;
+        private float _sumTarget;
 
         /// <summary>
         /// Gets the number of times the car touched a boundary wall.
         /// </summary>
         public int WallHits { get; private set; }
+
+        /// <summary>
+        /// Gets where the car was at each wall contact (the first 50), for diagnosis.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyList<Vector3> WallHitPositions => _wallHitPositions;
 
         /// <summary>
         /// Gets the throttle command; always full, as speed comes from the feedback level.
@@ -140,17 +150,46 @@ namespace MindX
             Vector3 frontRight = Quaternion.AngleAxis(diagonalAngle, Vector3.up) * forward;
             Vector3 frontLeft = Quaternion.AngleAxis(-diagonalAngle, Vector3.up) * forward;
 
+            float distLeft = Probe(-right);
+            float distRight = Probe(right);
+            float distForward = Probe(forward);
+            float targetLane = laneOffset + weave;
+
             _steer = ComputeSteer(
-                Probe(-right),
-                Probe(right),
+                distLeft,
+                distRight,
                 Probe(frontLeft),
                 Probe(frontRight),
-                Probe(forward),
-                laneOffset + weave,
+                distForward,
+                targetLane,
                 centreGain,
                 cornerGain,
                 lookAhead);
+
+            // Diagnostics: on straights (no corner within ~90% of the look-ahead) record
+            // where the car really is against where it was told to be.
+            if (distForward > lookAhead * 0.9f)
+            {
+                StraightSamples++;
+                _sumLateral += (distLeft - distRight) * 0.5f;
+                _sumTarget += targetLane;
+            }
         }
+
+        /// <summary>
+        /// Gets the number of per-frame samples taken on straight sections.
+        /// </summary>
+        public int StraightSamples { get; private set; }
+
+        /// <summary>
+        /// Gets the mean measured lateral offset on straights (positive is right of centre).
+        /// </summary>
+        public float StraightLateralMean => StraightSamples > 0 ? _sumLateral / StraightSamples : 0f;
+
+        /// <summary>
+        /// Gets the mean target lane on straights, for comparison with the measured offset.
+        /// </summary>
+        public float StraightTargetMean => StraightSamples > 0 ? _sumTarget / StraightSamples : 0f;
 
         private float Probe(Vector3 direction)
         {
@@ -159,7 +198,10 @@ namespace MindX
             float nearest = range;
             for (int i = 0; i < count; i++)
             {
-                if (Hits[i].collider.transform.IsChildOf(transform))
+                // Measure walls only. Anything with a Rigidbody is a car (this one or the
+                // other): treating the other car as a wall made the lane estimate jump when
+                // the cars ran abreast and steered a car into the wall.
+                if (Hits[i].rigidbody != null || Hits[i].collider.transform.IsChildOf(transform))
                 {
                     continue;
                 }
@@ -175,6 +217,10 @@ namespace MindX
             if (collision.collider.name.StartsWith("Cube", System.StringComparison.Ordinal))
             {
                 WallHits++;
+                if (_wallHitPositions.Count < 50)
+                {
+                    _wallHitPositions.Add(transform.position);
+                }
             }
         }
     }

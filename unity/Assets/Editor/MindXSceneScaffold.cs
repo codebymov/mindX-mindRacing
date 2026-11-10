@@ -369,14 +369,33 @@ namespace MindXEditor
         static GameObject EnsureCoinPrefab()
         {
             const string path = "Assets/Prefabs/Coin.prefab";
+
+            // A car counts as collecting a coin when it passes within this radius (metres).
+            // Each player's coins lie in that player's own lane (6 m apart) and a car weaves
+            // up to ~1.4 m about its lane, so 2.4 m reaches every coin in the own lane and
+            // none in the other lane.
+            const float PickupRadius = 2.4f;
+
             var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                var contents = PrefabUtility.LoadPrefabContents(path);
+                var existingTrigger = contents.GetComponent<SphereCollider>();
+                if (existingTrigger != null && !Mathf.Approximately(existingTrigger.radius, PickupRadius))
+                {
+                    existingTrigger.radius = PickupRadius;
+                    PrefabUtility.SaveAsPrefabAsset(contents, path);
+                }
+
+                PrefabUtility.UnloadPrefabContents(contents);
+                return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
 
             if (!AssetDatabase.IsValidFolder("Assets/Prefabs")) AssetDatabase.CreateFolder("Assets", "Prefabs");
             var root = new GameObject("Coin");
             var trigger = root.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 1.4f;
+            trigger.radius = PickupRadius;
             root.AddComponent<MindX.Coin>();
 
             var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -392,10 +411,12 @@ namespace MindXEditor
             return prefab;
         }
 
-        // Puts coins on the road on three lanes. The road centre at each angle is found by
-        // ray-casting to the inner and outer boundary walls and taking the midpoint, so no
-        // track data is needed. Travel is clockwise seen from above, so the "right of
-        // travel" side of the road is toward the infield.
+        // Puts coins on the road in two lanes, one per player: no lane is shared, so one
+        // player cannot take the other's coins first (the inside car laps faster, and a
+        // shared centre lane gave it nearly all of those coins). The road centre at each
+        // angle is found by ray-casting to the inner and outer boundary walls and taking
+        // the midpoint, so no track data is needed. Travel is clockwise seen from above, so
+        // the "right of travel" side of the road is toward the infield.
         static List<GameObject> PlaceCoins(Scene scene, GameObject track, GameObject coinPrefab)
         {
             var coins = new List<GameObject>();
@@ -409,7 +430,7 @@ namespace MindXEditor
 
             const int Steps = 72;
             const float Lane = 3f;
-            float[] lanes = { -Lane, 0f, Lane };
+            float[] lanes = { -Lane, Lane }; // car 1's lane (left of travel), car 2's lane (right)
             for (int k = 0; k < Steps; k += 3)
             {
                 float angle = k * 2f * Mathf.PI / Steps;
@@ -421,7 +442,7 @@ namespace MindXEditor
                 Vector3 onCentreLine = new Vector3(centre.x, 0f, centre.z) + dir * middle;
                 Vector3 tangent = Vector3.Cross(Vector3.up, dir);
                 Vector3 rightOfTravel = Vector3.Cross(Vector3.up, tangent);
-                Vector3 position = onCentreLine + rightOfTravel * lanes[(k / 3) % 3];
+                Vector3 position = onCentreLine + rightOfTravel * lanes[(k / 3) % 2];
                 position.y = 1.2f;
 
                 var coin = (GameObject)PrefabUtility.InstantiatePrefab(coinPrefab, scene);

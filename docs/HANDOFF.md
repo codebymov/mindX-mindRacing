@@ -161,6 +161,27 @@ at the end of every session, in the same commit as the work.
   sandbox forbids `System.Reflection`; don't work around it). Pitfall found twice:
   runtime-only caches/lists are lost when the scene reloads for Play — serialize
   them (ScoreHud entries) or rebuild lazily (ScaledTwin). Tests: Unity 44.
+  **Two bugs found by measuring, not guessing:** (1) the autopilot's side rays
+  counted the OTHER car as a wall, so abreast cars steered each other into the
+  walls (P2 touched the inner wall within seconds of the start) — it now measures
+  walls only (ignores anything with a Rigidbody); verified 0 wall hits over 2 min.
+  (2) Scores were unfair (P2 ≈ 2× P1's coins): the inside car laps ~9% faster and
+  a SHARED centre lane meant P2 always reached those coins first (a coin stays
+  gone 20 s). Coins are now in two lanes, one per player (12 each, pickup radius
+  2.4 m); result P1 22 / P2 23 coins, each from its own lane. `TrackAutopilot`
+  keeps diagnostics (`WallHitPositions`, straight-section lateral mean) and `Coin`
+  keeps `CollectedBy`; use them before tuning. Remaining honesty point: in
+  hyperscanning both cars have the same speed, so scores differ only by lap length
+  (~9%) and the occasional crash; a per-player brain→coins comparison needs
+  Individual mode (O7).
+  **Demo on the MNE path:** `simulate --lsl --full --toggle --montage
+  backend/configs/montage_demo.yaml` runs the MNE-NIRS preprocessing live on
+  synthetic data; gain is `MONTAGE_GAIN = 8` (INS spans ~0.15 → 0.22–0.25 there;
+  the generic gain 10 saturates the level at 1.0 — a test guards this).
+  `analysis/make_demo_brain_figure.py` draws the montage, both players' ΔHbO and
+  the INS/level (labelled SYNTHETIC) into `docs/demo/brain_synthetic.png`;
+  `analysis/make_demo_gif.py` + `DemoFrameRecorder` build the time-lapse GIF
+  (no ffmpeg on this machine). Tests now: backend 60, Unity 44.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

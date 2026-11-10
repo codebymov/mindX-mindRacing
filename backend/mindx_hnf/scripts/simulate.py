@@ -286,8 +286,16 @@ def main() -> None:
         help="operator console: press Enter (or type s) in this terminal to switch "
         "feedback between REAL and SHAM while the session runs.",
     )
+    parser.add_argument(
+        "--individual",
+        action="store_true",
+        help="DEMO PLACEHOLDER (O7 still open): one synthetic signal per player, so "
+        "the two cars get different speeds. Not combinable with --sham/--toggle.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
+    if args.individual and (args.sham or args.toggle):
+        parser.error("--individual does not support --sham or --toggle")
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -306,6 +314,29 @@ def main() -> None:
         )
     if args.log_csv is not None:
         sink = RecordingSink(sink, args.log_csv)
+    if args.individual:
+        from mindx_hnf.scripts.individual_demo import build_individual_demo
+
+        loop, sink = build_individual_demo(
+            fast=not args.full, sink=sink, montage=args.montage
+        )
+        print(
+            "INDIVIDUAL mode (demo placeholder, O7 still open): one signal per player.",
+            flush=True,
+        )
+        loop.run()
+        if args.log_csv is not None:
+            print(f"feedback samples written to {args.log_csv}")
+        published = getattr(sink, "published", [])
+        for subject in ("sub-01", "sub-02"):
+            levels = [s.level for s in published if s.subject == subject]
+            if levels:
+                print(
+                    f"{subject}: n={len(levels)} first={levels[0]:.3f} "
+                    f"last={levels[-1]:.3f} max={max(levels):.3f}"
+                )
+        return
+
     switch = FeedbackModeSwitch(mode)
     orch, sink = build_demo(
         mode=mode,

@@ -103,6 +103,7 @@ class SyntheticSource:
         duration_s: float | None = None,
         montage=None,
         realtime: bool = True,
+        subject_coherence_fn=None,
     ) -> None:
         """Create the source.
 
@@ -122,8 +123,13 @@ class SyntheticSource:
             realtime: Pace frames to the clock. False generates the whole run
                 instantly with sample-index timestamps (offline traces, such as a
                 sham dyad's recording).
+            subject_coherence_fn: Optional per-subject ground truth: a mapping
+                from subject id to a function of elapsed seconds giving that
+                subject's shared-component weight in [0, 1]. Overrides
+                ``coherence_fn`` per subject (Individual-mode demo).
         """
         self.realtime = realtime
+        self.subject_coherence_fn = subject_coherence_fn
         # With a montage, emit wavelength-paired intensities in the montage's
         # channel order so the MNE Beer-Lambert MBLL path can run end-to-end on
         # synthetic data (D10). The signal model is unchanged; only the channel
@@ -212,9 +218,13 @@ class SyntheticSource:
             fnirs: dict[SubjectId, np.ndarray] = {}
             for s in self.subjects:
                 indep = self._rng.standard_normal((self.n_channels, n)) * 0.5
+                # Individual demo: each subject can have their own activation profile.
+                cs = c
+                if self.subject_coherence_fn is not None:
+                    cs = float(np.clip(self.subject_coherence_fn[s](elapsed), 0.0, 1.0))
                 sig = (
-                    c * np.tile(shared, (self.n_channels, 1))
-                    + (1 - c) * self._rng.standard_normal((self.n_channels, n))
+                    cs * np.tile(shared, (self.n_channels, 1))
+                    + (1 - cs) * self._rng.standard_normal((self.n_channels, n))
                     + indep * 0.2
                 )
                 if self.montage is not None:

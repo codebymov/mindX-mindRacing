@@ -21,6 +21,7 @@ namespace MindXEditor
         const string CarPrefabPath = "Assets/CarControll/Prefabs (With Colliders)/Free Racing Car Blue Variant.prefab";
         const string GazeInteractorPrefab = "Assets/Samples/XR Interaction Toolkit/2.5.4/Starter Assets/Prefabs/Interactors/Gaze Interactor.prefab";
         const string TwoCarTestScene = "Assets/Scenes/TwoCarTest.unity";
+        const string TableArScene = "Assets/Scenes/TableARPreview.unity";
         const string CarBluePrefab = "Assets/CarControll/Prefabs (With Colliders)/Free Racing Car Blue Variant.prefab";
         const string CarRedPrefab = "Assets/CarControll/Prefabs (With Colliders)/Free Racing Car Red Variant.prefab";
 
@@ -212,6 +213,109 @@ namespace MindXEditor
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TwoCarTestScene);
             Log($"Two-car test built -> {TwoCarTestScene}. P1=WASD (left view), P2=Arrows (right view). Press Play.");
+        }
+
+        // A SIMULATED table-top AR view. The game runs 1:1 (the two-car test world);
+        // the table shows scaled visual twins of the track and cars, seen from a
+        // headset-like camera. No passthrough: this previews how the game would sit
+        // on a table, it is not the XR build.
+        [MenuItem("MindX/Build Table AR Preview (simulated)")]
+        public static void BuildTableArPreview()
+        {
+            BuildLocalTwoCarTest(); // leaves the 1:1 simulation as the active scene
+            var scene = EditorSceneManager.GetActiveScene();
+
+            const float Scale = 0.0075f; // the ~105 m ring becomes ~0.8 m on the table
+            var tableOrigin = new Vector3(1000f, 0.75f, 0f); // far from the 1:1 world; y = table top
+
+            var map = GameObject.Find("CircularMap");
+            if (map == null) { Warn("CircularMap not found; table preview not built"); return; }
+
+            // The ring centre is the point that sits at the middle of the table.
+            var tiles = map.GetComponentsInChildren<Collider>().Where(c => c.name.StartsWith("Track_")).ToArray();
+            Vector3 centre = Vector3.zero;
+            foreach (var t in tiles) centre += t.bounds.center;
+            centre /= Mathf.Max(1, tiles.Length);
+            var simOrigin = new Vector3(centre.x, 0f, centre.z);
+
+            // Room: floor and table.
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Room Floor";
+            floor.transform.position = new Vector3(tableOrigin.x, 0f, 0f);
+            floor.transform.localScale = Vector3.one * 0.6f;
+            var table = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            table.name = "Table";
+            table.transform.localScale = new Vector3(1.4f, 0.05f, 1.0f);
+            table.transform.position = new Vector3(tableOrigin.x, tableOrigin.y - 0.025f, tableOrigin.z);
+            foreach (var go in new[] { floor, table }) Object.DestroyImmediate(go.GetComponent<Collider>());
+            SetFlatColor(floor, "Assets/Scenes/TableAR_Floor.mat", new Color(0.16f, 0.15f, 0.14f));
+            SetFlatColor(table, "Assets/Scenes/TableAR_Table.mat", new Color(0.55f, 0.38f, 0.22f));
+
+            // Visual twin of the track: no colliders, and without the 15 m boundary walls.
+            var trackTwin = Object.Instantiate(map);
+            trackTwin.name = "TableTrack (visual twin)";
+            trackTwin.transform.SetParent(null);
+            foreach (var wall in trackTwin.GetComponentsInChildren<Transform>(true)
+                         .Where(t => t.name.StartsWith("Cube")).Select(t => t.gameObject).ToArray())
+                Object.DestroyImmediate(wall);
+            foreach (var col in trackTwin.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+            trackTwin.transform.position = MindX.ScaledTwin.MapPosition(map.transform.position, simOrigin, tableOrigin, Scale);
+            trackTwin.transform.rotation = map.transform.rotation;
+            trackTwin.transform.localScale = Vector3.one * Scale;
+
+            // Visual twins of the cars, following the simulated cars.
+            foreach (var driver in Object.FindObjectsByType<MindX.CarDriver>())
+            {
+                string prefabPath = driver.name.Contains("Red") ? CarRedPrefab : CarBluePrefab;
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                if (prefab == null) { Warn($"car prefab not found: {prefabPath}"); continue; }
+                var twin = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+                twin.name = driver.name + " (table twin)";
+                foreach (var mb in twin.GetComponentsInChildren<MonoBehaviour>(true)) Object.DestroyImmediate(mb);
+                foreach (var col in twin.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+                foreach (var body in twin.GetComponentsInChildren<Rigidbody>(true)) Object.DestroyImmediate(body);
+                twin.AddComponent<MindX.ScaledTwin>().Configure(driver.transform, simOrigin, tableOrigin, Scale);
+            }
+
+            // Headset-like viewpoint: seated, looking at the table. The per-player
+            // chase cameras are turned off; the simulated cars still steer by keyboard.
+            foreach (var cam in Object.FindObjectsByType<Camera>())
+                if (cam.GetComponentInParent<MindX.CarDriver>() != null) cam.gameObject.SetActive(false);
+            var viewGo = new GameObject("AR View Camera (simulated headset)");
+            viewGo.tag = "MainCamera";
+            var view = viewGo.AddComponent<Camera>();
+            view.fieldOfView = 55f;
+            view.nearClipPlane = 0.05f;
+            view.farClipPlane = 50f; // the 1:1 world is ~1 km away and stays out of view
+            viewGo.AddComponent<AudioListener>();
+            viewGo.transform.position = new Vector3(tableOrigin.x, 1.15f, tableOrigin.z - 0.72f);
+            viewGo.transform.LookAt(new Vector3(tableOrigin.x, tableOrigin.y, tableOrigin.z));
+
+            var hud = Object.FindFirstObjectByType<MindX.FeedbackHud>();
+            if (hud != null)
+                hud.Caption = "SIMULATED AR VIEW - track anchored on a table (headset pending). "
+                              + "Synthetic data; one shared INS drives both cars (hyperscanning).";
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, TableArScene);
+            Log($"Table AR preview built -> {TableArScene}. Steer P1=WASD, P2=Arrows. Press Play.");
+        }
+
+        // Gives a primitive a saved, flat-coloured material (an unsaved runtime
+        // material would be lost when the scene is reloaded).
+        static void SetFlatColor(GameObject go, string materialPath, Color color)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (mat == null)
+            {
+                mat = new Material(shader);
+                AssetDatabase.CreateAsset(mat, materialPath);
+            }
+
+            mat.color = color;
+            EditorUtility.SetDirty(mat);
+            go.GetComponent<Renderer>().sharedMaterial = mat;
         }
 
         static GameObject CreateTestCar(Scene scene, string prefabPath, string name, Vector3 pos, Quaternion rot,

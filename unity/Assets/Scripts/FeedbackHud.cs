@@ -15,8 +15,18 @@ namespace MindX
     public class FeedbackHud : MonoBehaviour
     {
         [SerializeField] private FeedbackReceiver[] receivers;
+        [SerializeField] private string caption;
 
         private GUIStyle _style;
+
+        /// <summary>
+        /// Gets or sets a line of text drawn along the bottom of the screen.
+        /// </summary>
+        public string Caption
+        {
+            get => caption;
+            set => caption = value;
+        }
 
         /// <summary>
         /// Sets the receivers to display.
@@ -33,6 +43,12 @@ namespace MindX
             {
                 _style = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
                 _style.normal.textColor = Color.white;
+            }
+
+            if (!string.IsNullOrEmpty(caption))
+            {
+                GUI.Box(new Rect(10f, Screen.height - 44f, Screen.width - 20f, 34f), GUIContent.none);
+                GUI.Label(new Rect(20f, Screen.height - 40f, Screen.width - 40f, 28f), caption, _style);
             }
 
             const float width = 320f;

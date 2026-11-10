@@ -115,6 +115,16 @@ at the end of every session, in the same commit as the work.
   XR settings. Start the backend with
   `backend/.venv/Scripts/python.exe -m mindx_hnf.scripts.simulate --lsl --full`
   (~5 min; default run lasts only ~17 s).
+  **Table AR preview (simulated):** menu *MindX ▸ Build Table AR Preview
+  (simulated)* builds `Assets/Scenes/TableARPreview.unity`. The game still runs
+  1:1; the table shows scaled visual twins (`ScaledTwin`, scale 0.0075, ring ≈
+  0.8 m) of the track and cars, seen from a seated headset-like camera. Physics
+  is deliberately not run at miniature scale (contact offset 1 cm > scaled wall
+  thickness; wheel colliders don't scale). Verified: twin mapping error 0.00000 m
+  while driving; EditMode 20/20. It is a SIMULATION of the AR view (no
+  passthrough, no anchoring) — say so in the presentation. Real AR needs the XR
+  rig (still broken) and a headset. Unity re-imported TextMesh Pro assets on its
+  own (uncommitted, not ours).
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

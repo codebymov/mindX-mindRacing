@@ -64,6 +64,8 @@ namespace MindX
 
         private IFeedbackTransport _transport;
         private float _currentLevel;
+        private float _rawIns;
+        private string _lastMode;
 
         /// <summary>
         /// Gets the latest routed feedback level in [0, 1] (0 until a sample
@@ -71,6 +73,18 @@ namespace MindX
         /// signal when <c>car</c> is left unassigned.
         /// </summary>
         public float Level => _currentLevel;
+
+        /// <summary>
+        /// Gets the latest raw INS value (before mapping). Display only.
+        /// </summary>
+        public float RawIns => _rawIns;
+
+        /// <summary>
+        /// Gets the latest feedback source, "real" or "sham", or null before the
+        /// first sample. For the operator overlay only: game behaviour must never
+        /// depend on it (sham must be indistinguishable to participants).
+        /// </summary>
+        public string LastMode => _lastMode;
 
         /// <summary>
         /// Gets a value indicating whether an LSL transport is attached.
@@ -112,6 +126,9 @@ namespace MindX
                 if (FeedbackWire.Drives(s.subjectIndex, carSubjectIndex))
                 {
                     _currentLevel = Mathf.Clamp01(s.level);
+                    // Stored for the operator overlay only; never branched on.
+                    _rawIns = s.rawIns;
+                    _lastMode = s.mode;
                 }
                 // TODO: log (s.tLsl, s.level, s.mode, s.rawIns) for offline analysis.
             }

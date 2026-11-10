@@ -246,7 +246,9 @@ namespace MindXEditor
             var table = GameObject.CreatePrimitive(PrimitiveType.Cube);
             table.name = "Table";
             table.transform.localScale = new Vector3(1.4f, 0.05f, 1.0f);
-            table.transform.position = new Vector3(tableOrigin.x, tableOrigin.y - 0.025f, tableOrigin.z);
+            // 4 mm below the anchor: the road underside sits exactly at the anchor height
+            // and would z-fight with a table top at the same height (patchy road).
+            table.transform.position = new Vector3(tableOrigin.x, tableOrigin.y - 0.025f - 0.004f, tableOrigin.z);
             foreach (var go in new[] { floor, table }) Object.DestroyImmediate(go.GetComponent<Collider>());
             SetFlatColor(floor, "Assets/Scenes/TableAR_Floor.mat", new Color(0.16f, 0.15f, 0.14f));
             SetFlatColor(table, "Assets/Scenes/TableAR_Table.mat", new Color(0.55f, 0.38f, 0.22f));
@@ -262,6 +264,9 @@ namespace MindXEditor
             trackTwin.transform.position = MindX.ScaledTwin.MapPosition(map.transform.position, simOrigin, tableOrigin, Scale);
             trackTwin.transform.rotation = map.transform.rotation;
             trackTwin.transform.localScale = Vector3.one * Scale;
+            NoShadows(trackTwin);
+            NoShadows(floor);
+            NoShadows(table);
 
             // Visual twins of the cars, following the simulated cars.
             foreach (var driver in Object.FindObjectsByType<MindX.CarDriver>())
@@ -275,6 +280,7 @@ namespace MindXEditor
                 foreach (var col in twin.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
                 foreach (var body in twin.GetComponentsInChildren<Rigidbody>(true)) Object.DestroyImmediate(body);
                 twin.AddComponent<MindX.ScaledTwin>().Configure(driver.transform, simOrigin, tableOrigin, Scale);
+                NoShadows(twin);
             }
 
             // Headset-like viewpoint: seated, looking at the table. The per-player
@@ -291,7 +297,7 @@ namespace MindXEditor
             viewGo.transform.position = new Vector3(tableOrigin.x, 1.15f, tableOrigin.z - 0.72f);
             viewGo.transform.LookAt(new Vector3(tableOrigin.x, tableOrigin.y, tableOrigin.z));
 
-            var hud = Object.FindFirstObjectByType<MindX.FeedbackHud>();
+            var hud = Object.FindAnyObjectByType<MindX.FeedbackHud>();
             if (hud != null)
                 hud.Caption = "SIMULATED AR VIEW - track anchored on a table (headset pending). "
                               + "Synthetic data; one shared INS drives both cars (hyperscanning).";
@@ -299,6 +305,18 @@ namespace MindXEditor
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TableArScene);
             Log($"Table AR preview built -> {TableArScene}. Steer P1=WASD, P2=Arrows. Press Play.");
+        }
+
+        // Miniature (0.0075 scale) geometry with default shadow bias shows dark
+        // acne blotches on the table, so the table-top twins neither cast nor
+        // receive shadows.
+        static void NoShadows(GameObject root)
+        {
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
         }
 
         // Gives a primitive a saved, flat-coloured material (an unsaved runtime

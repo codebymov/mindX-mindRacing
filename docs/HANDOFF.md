@@ -124,7 +124,22 @@ at the end of every session, in the same commit as the work.
   while driving; EditMode 20/20. It is a SIMULATION of the AR view (no
   passthrough, no anchoring) — say so in the presentation. Real AR needs the XR
   rig (still broken) and a headset. Unity re-imported TextMesh Pro assets on its
-  own (uncommitted, not ours).
+  own (uncommitted, not ours). Table road was patchy until the table top was
+  lowered 4 mm (road underside is coplanar with the anchor height → z-fighting;
+  it was not shadows).
+  **Live INS curve + sham toggle:** `FeedbackHud` draws a rolling curve of the
+  level (`LevelHistory`, 1 s buckets, 320 = whole 5-min session) and an operator
+  overlay on **F1** (hidden by default: source REAL/SHAM, raw INS, sham stretches
+  tinted orange). Participant view is one uniform colour. The source is changed
+  on the backend terminal: `simulate --lsl --full --toggle`, then press Enter
+  (or `s`) to flip REAL ↔ SHAM live (`FeedbackModeSwitch`; orchestrator reads it
+  every frame and keeps the sham replay indexed by task time). The sham trace is
+  now another synthetic dyad (`build_sham_trace`: seed 7, ramps 25% of a block
+  later and slower, same pipeline/scale); the old constant 0.30–0.35 trace would
+  have pinned the level at 1.0 after the gain change. Verified end to end:
+  Unity source flipped real→sham→real exactly at the operator's two Enters
+  (HUD timeline `REAL@0 SHAM@128 REAL@188`); real peak 0.71–0.80, sham ~0.2–0.36.
+  Tests: backend 59, Unity EditMode 26.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

@@ -65,6 +65,23 @@ namespace MindX
         private IFeedbackTransport _transport;
         private float _currentLevel;
 
+        /// <summary>
+        /// Gets the latest routed feedback level in [0, 1] (0 until a sample
+        /// arrives). Lets another driver (e.g. <see cref="CarDriver"/>) consume the
+        /// signal when <c>car</c> is left unassigned.
+        /// </summary>
+        public float Level => _currentLevel;
+
+        /// <summary>
+        /// Gets a value indicating whether an LSL transport is attached.
+        /// </summary>
+        public bool IsConnected => _transport != null;
+
+        /// <summary>
+        /// Gets the speed in m/s for the current level (base + bonus * level).
+        /// </summary>
+        public float TargetSpeed => baseSpeed + maxBonusSpeed * _currentLevel;
+
         void Start()
         {
             if (autoConnect && _transport == null)

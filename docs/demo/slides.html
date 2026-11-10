@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mindX demo slides</title>
+<style>
+  /* Plain black and white. Colour appears only in screenshots and figures. */
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .s { width: 1280px; height: 720px; padding: 56px 72px 64px; position: relative; overflow: hidden;
+       page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .s:last-child { page-break-after: auto; break-after: auto; }
+  h1 { font-size: 112px; line-height: 1; margin: 0; font-weight: 700; }
+  h2 { font-size: 46px; line-height: 1.1; margin: 0 0 18px; font-weight: 700; padding-bottom: 14px; border-bottom: 3px solid #000; }
+  h3 { font-size: 30px; margin: 0 0 8px; }
+  p, li { font-size: 28px; line-height: 1.35; margin: 0; }
+  ul { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 14px; }
+  .sub { font-size: 40px; margin-top: 16px; }
+  .small { font-size: 20px; color: #444; }
+  .foot { position: absolute; left: 72px; bottom: 24px; font-size: 18px; color: #444; }
+  .num { position: absolute; right: 72px; bottom: 24px; font-size: 18px; color: #444; }
+  .row { display: flex; gap: 36px; align-items: flex-start; }
+  .grow { flex: 1; min-width: 0; }
+  .box { border: 2px solid #000; padding: 18px 20px; }
+  .boxes { display: flex; align-items: stretch; gap: 10px; margin-top: 18px; }
+  .boxes .box { flex: 1; min-width: 0; }
+  .boxes .arrow { align-self: center; font-size: 36px; }
+  .boxes p { font-size: 22px; }
+  .big { font-size: 96px; font-weight: 700; line-height: 1; }
+  .shot { display: block; border: 1px solid #000; }
+  a { color: #000; }
+  .center { justify-content: center; }
+  .three { display: flex; gap: 24px; margin-top: 24px; }
+  .three .box { flex: 1; min-width: 0; }
+  .two { display: flex; gap: 28px; margin-top: 20px; }
+  .two .box { flex: 1; min-width: 0; }
+</style>
+</head>
+<body>
+
+<section class="s center">
+  <p class="small">START programme · multiuser XR neuromodulation</p>
+  <h1 style="margin-top:20px">mindX</h1>
+  <p class="sub">Neurofeedback for two</p>
+  <p style="margin-top:28px;width:900px">Two brains, one shared signal, fed back as speed in a cooperative race.</p>
+  <p class="foot">Demo with synthetic data · 15 minutes</p>
+</section>
+
+<section class="s center">
+  <h1 style="font-size:84px;line-height:1.08;width:1050px">Can two people learn to synchronise their brains?</h1>
+  <p class="sub" style="margin-top:36px">Does it carry over to cooperation?</p>
+  <p class="num">2</p>
+</section>
+
+<section class="s">
+  <h2>From two heads to one car</h2>
+  <div class="boxes">
+    <div class="box"><h3>Record</h3><p>Two fNIRS caps, one LSL clock</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3>Clean</h3><p>Causal MNE-NIRS pipeline</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3>Compare</h3><p>Joint synchrony, 22 s window</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3>Feed back</h3><p>Level 0–1. Speed = 5 + 15 × level</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3>Play</h3><p>Cars, coins, scores</p></div>
+  </div>
+  <p style="margin-top:36px;width:1000px">Causal and soft real-time. About 7 ms of processing per frame.</p>
+  <p class="num">3</p>
+</section>
+
+<section class="s">
+  <h2>fNIRS is slow</h2>
+  <div class="three">
+    <div class="box"><p class="big">5–7 s</p><p>haemodynamic lag</p></div>
+    <div class="box"><p class="big">22 s</p><p>window the estimate needs</p></div>
+    <div class="box"><p class="big">~30 s</p><p>until the car reacts</p></div>
+  </div>
+  <p style="margin-top:36px">Physiology, not a bug. The demo ramp is sped up.</p>
+  <p class="num">4</p>
+</section>
+
+<section class="s">
+  <h2>Baseline: level zero</h2>
+  <div class="row">
+    <img class="shot" src="key_baseline.jpg" width="800" height="450" alt="Two player views at level zero">
+    <ul class="grow"><li>Level 0, speed 5 m/s</li><li>One view per player</li><li>Own score in each view</li><li>10 points per coin</li></ul>
+  </div>
+  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">5</p>
+</section>
+
+<section class="s">
+  <h2>The signal rises, the car follows</h2>
+  <div class="row">
+    <img class="shot" src="key_rising.jpg" width="800" height="450" alt="Synchrony curve rising, scores growing">
+    <ul class="grow"><li>Speed 5 to 17 m/s</li><li>Coins per minute: 11 to 27</li><li>Delay about 30 s</li><li>TEAM total on top</li></ul>
+  </div>
+  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">6</p>
+</section>
+
+<section class="s">
+  <h2>Sham: another dyad's recording</h2>
+  <div class="row">
+    <img class="shot" src="key_sham.jpg" width="800" height="450" alt="Operator view showing Source SHAM">
+    <ul class="grow"><li>Same mapping, other source</li><li>Players cannot tell</li><li>Orange: operator view only</li><li>It also rises: real trajectory</li></ul>
+  </div>
+  <p class="foot">Operator view · participants never see this</p><p class="num">7</p>
+</section>
+
+<section class="s">
+  <h2>What the sensors see (synthetic)</h2>
+  <img class="shot" src="brain_synthetic.png" width="1000" height="503" alt="Montage, both players' haemoglobin signals, synchrony and feedback level" style="margin:0 auto">
+  <p class="foot">Synthetic data · the processing code is the real pipeline</p><p class="num">8</p>
+</section>
+
+<section class="s">
+  <h2>Two players, two scores</h2>
+  <div class="row">
+    <img class="shot" src="key_second.jpg" width="800" height="450" alt="Late in the session: scores, one crash each, team total">
+    <ul class="grow"><li>+10 per coin, own lane</li><li>−5 each on a crash</li><li>Scores differ by about 7%</li><li>Same signal, same speed</li></ul>
+  </div>
+  <p class="foot">Synthetic data · screenshot of the live session</p><p class="num">9</p>
+</section>
+
+<section class="s">
+  <h2>The whole session in 19 seconds</h2>
+  <div class="row" style="gap:24px;margin-top:8px">
+    <figure style="margin:0"><img class="shot" src="key_baseline.jpg" width="366" height="206" alt="Baseline"><p class="small" style="margin-top:6px">baseline</p></figure>
+    <figure style="margin:0"><img class="shot" src="key_rising.jpg" width="366" height="206" alt="Rising"><p class="small" style="margin-top:6px">signal rising</p></figure>
+    <figure style="margin:0"><img class="shot" src="key_second.jpg" width="366" height="206" alt="Second peak"><p class="small" style="margin-top:6px">second peak</p></figure>
+  </div>
+  <ul style="margin-top:30px">
+    <li>5 minutes of play, shown at about 18× speed</li>
+    <li>Video file: <a href="session_timelapse.mp4">session_timelapse.mp4</a></li>
+    <li>Same clip as a GIF: <a href="session_timelapse.gif">session_timelapse.gif</a></li>
+  </ul>
+  <p class="foot">Fallback if the live run fails</p><p class="num">10</p>
+</section>
+
+<section class="s">
+  <h2>AR on the table, simulated</h2>
+  <div class="boxes" style="margin-top:28px">
+    <div class="box"><h3>Game world</h3><p>Full size, in metres. Physics, coins and scores run here.</p></div>
+    <div class="arrow">→</div>
+    <div class="box"><h3>Table copy</h3><p>Scaled by 0.0075. Visual only. One view per player.</p></div>
+  </div>
+  <p style="margin-top:36px">Passthrough and anchoring arrive with the headset.</p>
+  <p class="num">11</p>
+</section>
+
+<section class="s">
+  <h2>Real code, synthetic data</h2>
+  <div class="two">
+    <div class="box"><h3>Synthetic</h3><ul><li>fNIRS of both players</li><li>Shared 0.05 Hz component</li><li>The sham partner</li><li>The AR table view</li></ul></div>
+    <div class="box"><h3>Real</h3><ul><li>MNE-NIRS online pipeline</li><li>Causal coherence estimate</li><li>LSL into the game</li><li>Coins, scores, penalty</li><li>Automated tests</li></ul></div>
+  </div>
+  <p class="num">12</p>
+</section>
+
+<section class="s">
+  <h2>Next steps</h2>
+  <div class="three">
+    <div class="box"><h3>Level B</h3><p>One person, live fNIRS</p><p class="small" style="margin-top:8px">2–4 weeks. Needs hardware.</p></div>
+    <div class="box"><h3>Level C</h3><p>Two people, live</p><p class="small" style="margin-top:8px">1–2+ months.</p></div>
+    <div class="box"><h3>Open</h3><p>Per-player feature (O7)</p><p>XR rig on XRI 3</p><p>Varjo XR-4</p></div>
+  </div>
+  <p style="font-size:56px;font-weight:700;margin-top:44px">Questions?</p>
+  <p class="num">13</p>
+</section>
+
+</body>
+</html>

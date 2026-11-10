@@ -7,6 +7,8 @@ the mapper gain left the level near 0.05.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from mindx_hnf.contracts import BlockType, FeedbackMode
@@ -48,6 +50,35 @@ def test_coherence_ramps_inside_each_task_block_and_resets_on_rest() -> None:
     assert fn(185.0) == COHERENCE_LOW  # rest block
     assert fn(190.0) == pytest.approx(COHERENCE_LOW)  # second task starts low again
     assert fn(300.0) == pytest.approx(COHERENCE_HIGH)
+
+
+def test_montage_demo_level_climbs_to_a_visible_range(monkeypatch) -> None:
+    """The MNE-montage path needs its own gain; the level must still be visible.
+
+    Without ``MONTAGE_GAIN`` the generic gain of 10 saturates the level at 1.0 here.
+    """
+    clock = [0.0]
+
+    class _Time:
+        @staticmethod
+        def sleep(dt: float) -> None:
+            clock[0] += dt
+
+    monkeypatch.setattr(sources, "lsl_clock", lambda: clock[0])
+    monkeypatch.setattr(sources, "time", _Time)
+    monkeypatch.setattr("mindx_hnf.orchestrator.lsl_clock", lambda: clock[0])
+
+    montage = Path(__file__).resolve().parents[1] / "configs" / "montage_demo.yaml"
+    orch, sink = build_demo(mode=FeedbackMode.REAL, fast=False, montage=montage)
+    orch.run()
+    levels = [s.level for s in sink.published]
+    early = levels[: len(levels) // 10]
+    plateau = levels[len(levels) // 2 - 20 : len(levels) // 2]
+    assert (
+        0.4 < max(levels) <= 1.0
+    ), f"max level {max(levels):.2f} outside a visible range"
+    assert sum(plateau) / len(plateau) < 0.95, "level saturated at 1.0 (gain too high)"
+    assert sum(plateau) / len(plateau) > 2 * (sum(early) / len(early))
 
 
 def test_full_length_demo_level_climbs_to_a_visible_range(monkeypatch) -> None:

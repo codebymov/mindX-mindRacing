@@ -38,6 +38,10 @@ RAMP_FRACTION = 0.6
 #: gain near 1 / 0.09 spreads that span over the game's [0, 1] range. The default
 #: of 2.0 capped the level near 0.17. Real data needs its own calibration.
 DEMO_GAIN = 10.0
+#: Demo gain on the MNE montage path (``--montage``). There the INS runs higher and
+#: spans about 0.15 (baseline) to 0.22-0.25 (task plateaus), so a smaller gain gives
+#: the same [0, 1] level range. Measured offline, 22 s window; real data needs its own.
+MONTAGE_GAIN = 8.0
 
 
 def coherence_profile(
@@ -215,7 +219,8 @@ def build_demo(
             montage=mont,
         )
     )
-    mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=DEMO_GAIN)
+    gain = MONTAGE_GAIN if mont is not None else DEMO_GAIN
+    mapper = BaselineSmoothingMapper(sham=sham, smoothing=0.3, gain=gain)
     if sink is None:
         sink = NullSink()
     scheduler = SessionScheduler(plan)

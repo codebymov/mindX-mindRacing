@@ -4,7 +4,7 @@ Read this first in a new Claude Code session (any device), right after
 `CLAUDE.md`. It records where the project stands and what to do next. Update it
 at the end of every session, in the same commit as the work.
 
-**Last updated:** 2026-10-05 (commits `4ad6f55` … `HEAD` on `main`).
+**Last updated:** 2026-11-10 (`main` @ `27fa99c`; branch `unity6-mcp`).
 
 ## Where we are
 
@@ -13,17 +13,18 @@ at the end of every session, in the same commit as the work.
 | Backend real-time loop | Works end-to-end on synthetic data (`simulate`, `simulate --montage configs/montage_demo.yaml`, `simulate --lsl`). |
 | MNE online (D10) | Phase 1 (MBLL) + Phase 2 (baseline-frozen OD, causal TDDR, wavelength-paired short-channel regression) **done**, each tested against MNE/MNE-NIRS. See `docs/MNE_ONLINE_SCOPE.md`. |
 | Backend → Unity transport (D9) | LSL. Wire format = `contracts/feedback_wire.json`, tested from both languages. |
-| Unity | Scripts split into `MindX.Runtime` + optional `MindX.Lsl` / `MindX.Ubiq` + `MindX.Tests.EditMode`. **Compile-checked** with Unity's Roslyn, **never run in the Editor yet**. LSL4Unity and Ubiq are **not installed** in the project. |
+| Unity | Scripts split into `MindX.Runtime` + optional `MindX.Lsl` / `MindX.Ubiq` + `MindX.Tests.EditMode`. Unity licence active (Personal). EditMode suite **runs and passes in the real Editor** (2022.3.5f1). Not yet opened interactively / played. LSL4Unity and Ubiq are **not installed** in the project. |
 | Multiplayer O5 (Ubiq, D11/D12) | Scaffolded only; Ubiq scripts never compiled against Ubiq. |
-| Tests | Python: 48 pass, 0 skipped. C# EditMode: 11 tests, written + compiled, not executed. See `docs/TESTING.md`. |
+| Tests | Python: 48 pass, 0 skipped. C# EditMode: 11/11 pass (2022.3.5f1 on `main`, 6000.5.1f1 on `unity6-mcp`). See `docs/TESTING.md`. |
+| Unity 6 + MCP | Branch `unity6-mcp` (worktree `../MindX-unity6`): Unity 6000.5.1f1, `com.unity.ai.assistant` 2.21.0-pre.2, XRI 3.5.0. Compiles, tests pass. **Open:** the XR rig `MRInteractionSetup` is a variant of the removed XRI 2.5.4 `XR Interaction Hands Setup` prefab and must be rebuilt in the Editor. Relay registered with Claude Code (`claude mcp add unity-mcp`, local scope); needs the Editor open + connection accepted in *Project Settings ▸ AI ▸ Unity MCP*. |
 | CI | `.github/workflows/backend.yml` (Linux + Windows, Py 3.11/3.13). No Unity CI. |
 | Style | Python: Google style + Google docstrings, enforced by ruff `D`. C#: Microsoft + Unity (`unity/.editorconfig`). |
 
 ## Next tasks, in order
 
-1. **Activate a Unity licence** (sign in to Unity Hub, Personal is fine) on the
-   machine with Unity 2022.3.5f1, then run the EditMode suite (command in
-   `docs/TESTING.md`) and fix anything it finds. Blocked on the user.
+1. ~~Activate Unity licence, run EditMode suite~~ — done 2026-11-10 (11/11).
+   Decide: merge `unity6-mcp` (Unity 6 + MCP) after the rig rebuild, or stay on
+   2022.3 for Level A. Do Level A on whichever branch is chosen, not both.
 2. **Unity Editor pass → "Level A" demo** (synthetic signal driving the car in a
    headset): install LSL4Unity (`docs/LSL_UNITY_SETUP.md`, URL verified), open
    the scene, `simulate --lsl`, confirm the car responds; build to headset.
@@ -76,6 +77,16 @@ at the end of every session, in the same commit as the work.
 - `backend/.venv/Lib/site-packages/~umpy`: leftover pip temp dir, safe to delete.
 
 ## Session log
+
+- **2026-11-10** — Unity licence active. First real EditMode run found a
+  compile error in `Assets/Editor/MindXSceneScaffold.cs` (unqualified
+  `KeyboardCarInput.Scheme`; Roslyn check never covered `Assets/Editor`) —
+  fixed (`27fa99c`), 11/11 pass. Unity wipes `Temp/` on exit, so
+  `-testResults` must point elsewhere. Started branch `unity6-mcp` for the
+  official Unity MCP (needs Unity 6): XRI 2.5.4→3.5.0 samples swapped (GUIDs
+  preserved), XR Hands sample 1.4.0→1.8.0, two MR-template scripts given
+  XRI 3 namespaces, Photon `GetInstanceID` patched. Pre-existing: `Road (2)`
+  missing prefab in `Car Controll.prefab`.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

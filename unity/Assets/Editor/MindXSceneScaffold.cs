@@ -205,6 +205,10 @@ namespace MindXEditor
 
             WireFeedback(scene, new[] { car1, car2 });
 
+            // Safety net: a car that leaves the play area is put back on the road.
+            foreach (var car in new[] { car1, car2 })
+                car.AddComponent<MindX.CarRecovery>().TrackRoot = trackRoot.transform;
+
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TwoCarTestScene);
             Log($"Two-car test built -> {TwoCarTestScene}. P1=WASD (left view), P2=Arrows (right view). Press Play.");

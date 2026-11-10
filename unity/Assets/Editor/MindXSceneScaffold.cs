@@ -350,7 +350,7 @@ namespace MindXEditor
             var hud = Object.FindAnyObjectByType<MindX.FeedbackHud>();
             if (hud != null)
                 hud.Caption = "SIMULATED AR VIEW - track anchored on a table (headset pending). "
-                              + "Synthetic data; one shared INS drives both cars (hyperscanning).";
+                              + "Synthetic data. {mode}";
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TableArScene);

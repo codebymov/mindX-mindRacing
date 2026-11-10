@@ -95,7 +95,7 @@ namespace MindX
             if (hasCaption)
             {
                 GUI.Box(new Rect(10f, Screen.height - 44f, Screen.width - 20f, 34f), GUIContent.none);
-                GUI.Label(new Rect(20f, Screen.height - 40f, Screen.width - 40f, 28f), caption, _style);
+                GUI.Label(new Rect(20f, Screen.height - 40f, Screen.width - 40f, 28f), ResolveCaption(), _style);
             }
 
             DrawStatus();
@@ -104,6 +104,26 @@ namespace MindX
             {
                 DrawOperatorOverlay();
             }
+        }
+
+        // Replaces "{mode}" in the caption with a sentence for the session mode that is
+        // actually being received, so the caption never claims the wrong signal layout.
+        private string ResolveCaption()
+        {
+            if (!caption.Contains("{mode}"))
+            {
+                return caption;
+            }
+
+            string session = receivers != null && receivers.Length > 0 && receivers[0] != null
+                ? receivers[0].LastSessionMode
+                : null;
+            string text = session == "individual"
+                ? "Individual mode (demo placeholder): one signal per player."
+                : session == "hyperscanning"
+                    ? "Hyperscanning: one shared INS drives both cars."
+                    : string.Empty;
+            return caption.Replace("{mode}", text).TrimEnd();
         }
 
         private void DrawStatus()

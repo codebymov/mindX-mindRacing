@@ -66,6 +66,13 @@ namespace MindX
         private float _currentLevel;
         private float _rawIns;
         private string _lastMode;
+        private string _lastSessionMode;
+
+        /// <summary>
+        /// Gets the latest session mode, "hyperscanning" or "individual", or null before
+        /// the first sample. Used for the on-screen caption only.
+        /// </summary>
+        public string LastSessionMode => _lastSessionMode;
 
         /// <summary>
         /// Gets the latest routed feedback level in [0, 1] (0 until a sample
@@ -131,6 +138,7 @@ namespace MindX
                     // Stored for the operator overlay only; never branched on.
                     _rawIns = s.rawIns;
                     _lastMode = s.mode;
+                    _lastSessionMode = s.sessionMode;
                 }
                 // TODO: log (s.tLsl, s.level, s.mode, s.rawIns) for offline analysis.
             }

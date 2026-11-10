@@ -190,6 +190,18 @@ at the end of every session, in the same commit as the work.
   to install ffmpeg for an MP4; (c) the XR rig migration to XRI 3. Phone approvals
   need Remote Control enabled by the user (`/remote-control` in the session); the
   PushNotification tool only reaches the terminal until then.
+  **Individual mode DEMO PLACEHOLDER (does NOT decide O7):** `simulate --individual
+  [--lsl --full --montage ...]` gives each player their own synthetic activation
+  profile and signal (placeholder feature = causal windowed 0.01-0.1 Hz power of that
+  player's own channel-mean HbO, `scripts/individual_demo.py`), their own baseline
+  and INDIVIDUAL-mode mapper; one sample per player per tick (subject index 0/1).
+  Gains are measured (1000 generic, 5 on the MNE montage path). No sham/--toggle in
+  this mode. Unity needed a fix: `FeedbackReceiver` now drains all pending samples
+  and `LslFeedbackTransport.TryGetLatest` returns one per call (it kept only the
+  newest, so a car never saw its own sample); the table caption now picks its text
+  from the received session mode (`{mode}` token). Measured end to end on the MNE
+  path at play t=172 s: P1 level 0.80 / 17.1 m/s / 38 coins per min, P2 level 0.39 /
+  10.8 m/s / 22 per min, 0 wall hits. Tests: backend 67, Unity 45.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

@@ -121,6 +121,26 @@ Time-lapse of a full session. Use it as the fallback.
 
 ![Time-lapse](demo/session_timelapse.gif)
 
+## Individual mode (placeholder)
+
+- Optional. Shows two cars with different speeds.
+- It is a demo placeholder. It does not decide O7.
+- Start the backend like this instead:
+
+```
+cd C:\Users\sukha\MindX-unity6\backend
+C:\Users\sukha\MindX\backend\.venv\Scripts\python.exe -m mindx_hnf.scripts.simulate --individual --lsl --full --montage configs\montage_demo.yaml
+```
+
+- No sham, no Enter toggle in this mode.
+- Each player has their own synthetic signal and baseline.
+- Player 1 reacts earlier and stronger. Player 2 later and weaker.
+- Measured: P1 level 0.80 (17 m/s), P2 level 0.39 (11 m/s).
+- Coins per minute follow: 38 for P1, 22 for P2.
+- The caption on screen says "Individual mode (demo placeholder)".
+- Say: "Same pipeline, but each player drives their own car."
+- Do not say: that the feature is final. The real one is still open.
+
 ## Say this
 
 - The data is synthetic. The pipeline is real.

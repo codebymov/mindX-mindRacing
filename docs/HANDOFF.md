@@ -86,7 +86,20 @@ at the end of every session, in the same commit as the work.
   block) the level was only ~0.06, so speed went 5.0 → ~5.9 m/s — correct but
   barely visible. The LSL sink does not record levels, so the full curve was not
   seen; add a log/CSV sink, then tune mapper gain or window for the demo.
-  Cars have no steering input unless a key is held, so they drive off the ring.
+  **Placement fixed (same day):** cars had spawned ~12 m up on top of a boundary
+  wall (the old spawn probe hit the 15 m `Cube` walls) and `CarDriver` zeroed
+  gravity by overwriting the whole velocity. The scaffold now spawns on a
+  `Track_line*` tile surface, facing the ring tangent, ±2.5 m about the road
+  centre line, with roll/pitch frozen; `CarDriver` keeps vertical velocity; the
+  scaffold also wires `FeedbackReceiver` + HUD. Measured geometry (do not
+  guess): car 2.1×1.4×4.8 m, road tiles 15 m wide (straights 15×15, corners
+  30×30), road surface y≈0.0–0.1, boundary walls 15 m tall, ring ≈105×107 m.
+  Proportions are realistic (circuit width), so nothing was rescaled. Unity
+  inspection recipe: `Unity_RunCommand` for bounds/raycasts,
+  `Unity_SceneView_CaptureMultiAngleSceneView` for images (open a Scene View
+  window first); `Unity_Camera_Capture` failed with 64-bit EntityIds.
+  Known: `FeedbackReceiver.Start` blocks ~5 s per car in `resolve_stream` when no
+  stream exists — start the backend first, or move resolve off the main thread.
   The Unity 6 API updater changed `velocity` → `linearVelocity`
   (`CarController`, `XRCarController`, `CarDriver`): this branch must not merge
   to `main` (2022.3) as-is. Still broken: XR rig prefab (XRI 3 migration),

@@ -174,6 +174,7 @@ namespace MindXEditor
 
             // bounds of the track + a safety ground plane so cars never fall into the void
             Vector3 start = new Vector3(0f, 1f, 0f);
+            Vector3 tangent = Vector3.forward;
             if (trackCopy != null)
             {
                 var rends = trackCopy.GetComponentsInChildren<Renderer>();
@@ -188,34 +189,43 @@ namespace MindXEditor
                     ground.transform.position = new Vector3(b.center.x, b.min.y, b.center.z);
                     ground.transform.localScale = Vector3.one * (Mathf.Max(b.size.x, b.size.z) / 5f);
 
-                    if (TryFindTrackSurface(b, out var surf)) start = surf + Vector3.up * 0.6f;
-                    else start = new Vector3(b.center.x, b.min.y + 0.6f, b.center.z);
+                    if (TryFindRoadSpawn(trackCopy, out var spawn, out tangent)) start = spawn;
+                    else Warn("no road tile found; cars placed at the origin");
                 }
             }
 
-            CreateTestCar(scene, CarBluePrefab, "Car_Player1 (Blue)", start + Vector3.left * 2f,
+            Quaternion facing = Quaternion.LookRotation(tangent, Vector3.up);
+            Vector3 right = Vector3.Cross(Vector3.up, tangent);
+            const float LaneOffset = 2.5f; // metres either side of the road centre line
+
+            var car1 = CreateTestCar(scene, CarBluePrefab, "Car_Player1 (Blue)", start - right * LaneOffset, facing,
                           MindX.KeyboardCarInput.Scheme.WASD, new Rect(0f, 0f, 0.5f, 1f), addListener: true);
-            CreateTestCar(scene, CarRedPrefab, "Car_Player2 (Red)", start + Vector3.right * 2f,
+            var car2 = CreateTestCar(scene, CarRedPrefab, "Car_Player2 (Red)", start + right * LaneOffset, facing,
                           MindX.KeyboardCarInput.Scheme.Arrows, new Rect(0.5f, 0f, 0.5f, 1f), addListener: false);
+
+            WireFeedback(scene, new[] { car1, car2 });
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TwoCarTestScene);
             Log($"Two-car test built -> {TwoCarTestScene}. P1=WASD (left view), P2=Arrows (right view). Press Play.");
         }
 
-        static void CreateTestCar(Scene scene, string prefabPath, string name, Vector3 pos,
+        static GameObject CreateTestCar(Scene scene, string prefabPath, string name, Vector3 pos, Quaternion rot,
                                   MindX.KeyboardCarInput.Scheme scheme, Rect viewport, bool addListener)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             GameObject car;
             if (prefab != null) { car = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene); car.name = name; }
             else { car = new GameObject(name); SceneManager.MoveGameObjectToScene(car, scene); Warn($"car prefab not found: {prefabPath}"); }
-            car.transform.position = pos;
+            car.transform.SetPositionAndRotation(pos, rot);
 
             // strip any conflicting movers from the prefab so only CarDriver moves it
             foreach (var cc in car.GetComponents<CarController>()) Object.DestroyImmediate(cc);
             foreach (var fr in car.GetComponents<MindX.FeedbackReceiver>()) Object.DestroyImmediate(fr);
             if (car.GetComponent<Rigidbody>() == null) car.AddComponent<Rigidbody>();
+
+            // CarDriver steers by rotating about Y only: lock roll/pitch so the car cannot tip.
+            car.GetComponent<Rigidbody>().constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
 
             var input = car.GetComponent<MindX.KeyboardCarInput>();
             if (input == null) input = car.AddComponent<MindX.KeyboardCarInput>();
@@ -229,25 +239,71 @@ namespace MindXEditor
             var cam = camGO.AddComponent<Camera>();
             cam.rect = viewport;
             if (addListener) camGO.AddComponent<AudioListener>();
+            return car;
         }
 
-        // Scan downward from above the track to find a road point on the ring
-        // (the center of a circular track is empty, so try increasing radii).
-        static bool TryFindTrackSurface(Bounds b, out Vector3 point)
+        // Adds a FeedbackReceiver to each car (subject index = car index), points
+        // CarDriver at it so LSL level sets the speed, and adds the on-screen HUD.
+        static void WireFeedback(Scene scene, GameObject[] cars)
+        {
+            var receivers = new MindX.FeedbackReceiver[cars.Length];
+            for (int i = 0; i < cars.Length; i++)
+            {
+                var fr = cars[i].AddComponent<MindX.FeedbackReceiver>();
+                var so = new SerializedObject(fr);
+                so.FindProperty("streamName").stringValue = "mindx_feedback";
+                so.FindProperty("autoConnect").boolValue = true;
+                so.FindProperty("carSubjectIndex").intValue = i;
+                so.FindProperty("car").objectReferenceValue = null; // CarDriver moves the car
+                so.ApplyModifiedPropertiesWithoutUndo();
+                cars[i].GetComponent<MindX.CarDriver>().LevelSource = fr;
+                receivers[i] = fr;
+            }
+
+            var hudGo = new GameObject("FeedbackHud");
+            SceneManager.MoveGameObjectToScene(hudGo, scene);
+            hudGo.AddComponent<MindX.FeedbackHud>().SetReceivers(receivers);
+        }
+
+        // Finds a spawn point ON THE ROAD: the surface of a straight road tile
+        // (only colliders named Track_* under the track count, never the boundary
+        // walls), plus the driving direction along the ring. Cars face
+        // the tangent of the ring at that tile, snapped to the tile's axis.
+        static bool TryFindRoadSpawn(GameObject track, out Vector3 point, out Vector3 tangent)
         {
             point = Vector3.zero;
-            float top = b.max.y + 10f;
-            foreach (var f in new[] { 0.5f, 0.7f, 0.6f, 0.8f, 0.4f, 0.9f, 0.0f })
-                foreach (var dir in new[] { Vector3.right, Vector3.forward, Vector3.left, Vector3.back })
-                {
-                    Vector3 xz = b.center + dir * (b.extents.x * f);
-                    if (Physics.Raycast(new Vector3(xz.x, top, xz.z), Vector3.down, out var hit, 60f))
-                    {
-                        point = hit.point;
-                        return true;
-                    }
-                }
-            return false;
+            tangent = Vector3.forward;
+
+            var tiles = track.GetComponentsInChildren<Collider>()
+                .Where(c => c.name.StartsWith("Track_")).ToArray();
+            if (tiles.Length == 0) return false;
+
+            // Ring centre = mean of the tile centres; pick the straight tile with the lowest Z.
+            Vector3 centre = Vector3.zero;
+            foreach (var t in tiles) centre += t.bounds.center;
+            centre /= tiles.Length;
+
+            var straight = tiles.Where(c => c.name.StartsWith("Track_line"))
+                .OrderBy(c => c.bounds.center.z).FirstOrDefault();
+            if (straight == null) return false;
+
+            Vector3 top = straight.bounds.center + Vector3.up * 50f;
+            bool found = false;
+            foreach (var hit in Physics.RaycastAll(top, Vector3.down, 100f))
+            {
+                if (hit.collider != straight) continue; // ignore walls and the safety plane
+                point = hit.point + Vector3.up * 0.15f;
+                found = true;
+                break;
+            }
+            if (!found) return false;
+
+            Vector3 radial = straight.bounds.center - centre; radial.y = 0f;
+            Vector3 around = Vector3.Cross(Vector3.up, radial); // anticlockwise seen from above
+            tangent = Mathf.Abs(around.x) > Mathf.Abs(around.z)
+                ? new Vector3(Mathf.Sign(around.x), 0f, 0f)
+                : new Vector3(0f, 0f, Mathf.Sign(around.z));
+            return true;
         }
 
         static GameObject FindInScene(Scene s, string name)

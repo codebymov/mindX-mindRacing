@@ -58,7 +58,12 @@ namespace MindX
             else
                 _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, brakePower * 0.5f * Time.deltaTime);
 
-            _rb.linearVelocity = transform.forward * _currentSpeed;
+            // Drive along the ground plane only; keep the vertical component so
+            // gravity and wheel suspension still act on the car.
+            Vector3 flatForward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+            Vector3 velocity = flatForward * _currentSpeed;
+            velocity.y = _rb.linearVelocity.y;
+            _rb.linearVelocity = velocity;
 
             if (Mathf.Abs(steer) > 0.1f && _currentSpeed > 0.5f)
                 transform.Rotate(Vector3.up, steer * turnSpeed * Time.deltaTime);

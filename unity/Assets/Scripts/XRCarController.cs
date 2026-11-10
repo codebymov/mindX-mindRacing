@@ -53,7 +53,7 @@ public class XRCarController : MonoBehaviour
             currentSpeed = Mathf.Max(currentSpeed - brakePower * Mathf.Abs(throttle) * Time.deltaTime, 0f);
         }
 
-        rb.velocity = transform.forward * currentSpeed;
+        rb.linearVelocity = transform.forward * currentSpeed;
 
         if (Mathf.Abs(steer) > 0.1f && currentSpeed > 0.5f)
         {

@@ -48,7 +48,7 @@ public class CarController : MonoBehaviour
         {
             currentSpeed += acceleration * Time.deltaTime;
         }
-        rb.velocity = transform.forward * currentSpeed;
+        rb.linearVelocity = transform.forward * currentSpeed;
     }
 
     void Brake()
@@ -57,7 +57,7 @@ public class CarController : MonoBehaviour
         {
             currentSpeed -= brakePower * Time.deltaTime;
         }
-        rb.velocity = transform.forward * currentSpeed;
+        rb.linearVelocity = transform.forward * currentSpeed;
     }
 
     void TurnLeft()

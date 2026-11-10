@@ -6,6 +6,7 @@
 //   Unity.exe -batchmode -quit -projectPath <unity> -executeMethod MindXEditor.MindXSceneScaffold.Build
 // Idempotent: re-running rebuilds TrackRoot cleanly. Non-destructive to the rig.
 
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -210,6 +211,16 @@ namespace MindXEditor
             foreach (var car in new[] { car1, car2 })
                 car.AddComponent<MindX.CarRecovery>().TrackRoot = trackRoot.transform;
 
+            // Game mechanics: coins on the road and a score per player. The score is drawn
+            // in that player's own view; faster driving (a higher brain-synchrony level)
+            // passes more coins per minute.
+            var score1 = AddScore(car1, "P1");
+            var score2 = AddScore(car2, "P2");
+            if (trackCopy != null) PlaceCoins(scene, trackCopy, EnsureCoinPrefab());
+            var scoreHud = new GameObject("ScoreHud").AddComponent<MindX.ScoreHud>();
+            scoreHud.Add(score1, car1.GetComponentInChildren<Camera>());
+            scoreHud.Add(score2, car2.GetComponentInChildren<Camera>());
+
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TwoCarTestScene);
             Log($"Two-car test built -> {TwoCarTestScene}. P1=WASD (left view), P2=Arrows (right view). Press Play.");
@@ -224,6 +235,29 @@ namespace MindXEditor
         {
             BuildLocalTwoCarTest(); // leaves the 1:1 simulation as the active scene
             var scene = EditorSceneManager.GetActiveScene();
+
+            // Autopilot instead of the keyboard: each car holds its own lane and weaves
+            // with its own period, so the cars stay on the track and take different
+            // lines. Speed still comes from the feedback level (CarDriver.LevelSource).
+            var pilots = Object.FindObjectsByType<MindX.CarDriver>().OrderBy(d => d.name).ToArray();
+            for (int i = 0; i < pilots.Length; i++)
+            {
+                foreach (var keys in pilots[i].GetComponents<MindX.KeyboardCarInput>()) Object.DestroyImmediate(keys);
+                var pilot = pilots[i].gameObject.AddComponent<MindX.TrackAutopilot>();
+                // Lanes 4.8 m apart with a 1.4 m weave: the cars take different lines and
+                // only occasionally touch (the gap can close to ~2 m, about a car width), so
+                // the crash penalty is possible but not constant.
+                pilot.LaneOffset = i == 0 ? -2.4f : 2.4f; // car 1 left lane, car 2 right lane of travel
+                pilot.SetWeave(1.4f, i == 0 ? 23f : 31f, i == 0 ? 0f : 1.7f);
+                var driverSo = new SerializedObject(pilots[i]);
+                driverSo.FindProperty("turnSpeed").floatValue = 120f; // corners at up to ~17 m/s
+                driverSo.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            // Light from the side: the two seats look along the table's length, and the
+            // default light shines straight at one of them, washing that view out.
+            var sun = Object.FindAnyObjectByType<Light>();
+            if (sun != null) sun.transform.rotation = Quaternion.Euler(65f, 90f, 0f);
 
             const float Scale = 0.0075f; // the ~105 m ring becomes ~0.8 m on the table
             var tableOrigin = new Vector3(1000f, 0.75f, 0f); // far from the 1:1 world; y = table top
@@ -283,19 +317,35 @@ namespace MindXEditor
                 NoShadows(twin);
             }
 
-            // Headset-like viewpoint: seated, looking at the table. The per-player
-            // chase cameras are turned off; the simulated cars still steer by keyboard.
+            // Coin twins: a miniature of every coin on the table, hidden while collected.
+            foreach (var coin in Object.FindObjectsByType<MindX.Coin>())
+            {
+                var coinTwin = Object.Instantiate(coin.gameObject);
+                coinTwin.name = coin.name + " (table twin)";
+                foreach (var logic in coinTwin.GetComponentsInChildren<MindX.Coin>(true)) Object.DestroyImmediate(logic);
+                foreach (var col in coinTwin.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+                coinTwin.AddComponent<MindX.ScaledTwin>().Configure(coin.transform, simOrigin, tableOrigin, Scale);
+                NoShadows(coinTwin);
+            }
+
+            // Two simulated headset views, one per player, seated on opposite sides of the
+            // table and shown side by side. The chase cameras are turned off; each view shows
+            // that player's own score. The simulated cars are still driven in the 1:1 world.
             foreach (var cam in Object.FindObjectsByType<Camera>())
                 if (cam.GetComponentInParent<MindX.CarDriver>() != null) cam.gameObject.SetActive(false);
-            var viewGo = new GameObject("AR View Camera (simulated headset)");
-            viewGo.tag = "MainCamera";
-            var view = viewGo.AddComponent<Camera>();
-            view.fieldOfView = 55f;
-            view.nearClipPlane = 0.05f;
-            view.farClipPlane = 50f; // the 1:1 world is ~1 km away and stays out of view
-            viewGo.AddComponent<AudioListener>();
-            viewGo.transform.position = new Vector3(tableOrigin.x, 1.15f, tableOrigin.z - 0.72f);
-            viewGo.transform.LookAt(new Vector3(tableOrigin.x, tableOrigin.y, tableOrigin.z));
+            var tableCentre = new Vector3(tableOrigin.x, tableOrigin.y, tableOrigin.z);
+            var view1 = CreateHeadsetView("P1 Headset View (simulated)", tableCentre + new Vector3(0f, 0.4f, -0.72f), tableCentre,
+                                          new Rect(0f, 0f, 0.5f, 1f), withListener: true);
+            var view2 = CreateHeadsetView("P2 Headset View (simulated)", tableCentre + new Vector3(0f, 0.4f, 0.72f), tableCentre,
+                                          new Rect(0.5f, 0f, 0.5f, 1f), withListener: false);
+            var tableScores = Object.FindObjectsByType<MindX.CarScore>().OrderBy(s => s.name).ToArray();
+            var tableScoreHud = Object.FindAnyObjectByType<MindX.ScoreHud>();
+            if (tableScoreHud != null && tableScores.Length >= 2)
+            {
+                tableScoreHud.Clear();
+                tableScoreHud.Add(tableScores[0], view1);
+                tableScoreHud.Add(tableScores[1], view2);
+            }
 
             var hud = Object.FindAnyObjectByType<MindX.FeedbackHud>();
             if (hud != null)
@@ -305,6 +355,102 @@ namespace MindXEditor
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, TableArScene);
             Log($"Table AR preview built -> {TableArScene}. Steer P1=WASD, P2=Arrows. Press Play.");
+        }
+
+        static MindX.CarScore AddScore(GameObject car, string playerName)
+        {
+            var score = car.AddComponent<MindX.CarScore>();
+            score.PlayerName = playerName;
+            return score;
+        }
+
+        // A spinning gold disc with a trigger, saved as a prefab so it is a real asset
+        // that can be replaced by art later (keep the Coin component and the trigger).
+        static GameObject EnsureCoinPrefab()
+        {
+            const string path = "Assets/Prefabs/Coin.prefab";
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+
+            if (!AssetDatabase.IsValidFolder("Assets/Prefabs")) AssetDatabase.CreateFolder("Assets", "Prefabs");
+            var root = new GameObject("Coin");
+            var trigger = root.AddComponent<SphereCollider>();
+            trigger.isTrigger = true;
+            trigger.radius = 1.4f;
+            root.AddComponent<MindX.Coin>();
+
+            var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            disc.name = "Disc";
+            disc.transform.SetParent(root.transform, false);
+            disc.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stands on its edge
+            disc.transform.localScale = new Vector3(1.7f, 0.1f, 1.7f);
+            Object.DestroyImmediate(disc.GetComponent<Collider>());
+            SetFlatColor(disc, "Assets/Prefabs/Coin_Gold.mat", new Color(1f, 0.78f, 0.1f));
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            return prefab;
+        }
+
+        // Puts coins on the road on three lanes. The road centre at each angle is found by
+        // ray-casting to the inner and outer boundary walls and taking the midpoint, so no
+        // track data is needed. Travel is clockwise seen from above, so the "right of
+        // travel" side of the road is toward the infield.
+        static List<GameObject> PlaceCoins(Scene scene, GameObject track, GameObject coinPrefab)
+        {
+            var coins = new List<GameObject>();
+            var tiles = track.GetComponentsInChildren<Collider>().Where(c => c.name.StartsWith("Track_")).ToArray();
+            if (tiles.Length == 0 || coinPrefab == null) return coins;
+
+            Vector3 centre = Vector3.zero;
+            foreach (var t in tiles) centre += t.bounds.center;
+            centre /= tiles.Length;
+            var origin = new Vector3(centre.x, 1f, centre.z);
+
+            const int Steps = 72;
+            const float Lane = 3f;
+            float[] lanes = { -Lane, 0f, Lane };
+            for (int k = 0; k < Steps; k += 3)
+            {
+                float angle = k * 2f * Mathf.PI / Steps;
+                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                if (!Physics.Raycast(origin, dir, out var inner, 200f) || !inner.collider.name.StartsWith("Cube")) continue;
+                if (!Physics.Raycast(origin + dir * 150f, -dir, out var outer, 200f) || !outer.collider.name.StartsWith("Cube")) continue;
+
+                float middle = (inner.distance + (150f - outer.distance)) * 0.5f;
+                Vector3 onCentreLine = new Vector3(centre.x, 0f, centre.z) + dir * middle;
+                Vector3 tangent = Vector3.Cross(Vector3.up, dir);
+                Vector3 rightOfTravel = Vector3.Cross(Vector3.up, tangent);
+                Vector3 position = onCentreLine + rightOfTravel * lanes[(k / 3) % 3];
+                position.y = 1.2f;
+
+                var coin = (GameObject)PrefabUtility.InstantiatePrefab(coinPrefab, scene);
+                coin.name = $"Coin {coins.Count + 1}";
+                coin.transform.position = position;
+                coins.Add(coin);
+            }
+
+            Log($"placed {coins.Count} coins on the road");
+            return coins;
+        }
+
+        static Camera CreateHeadsetView(string name, Vector3 position, Vector3 lookAt, Rect viewport, bool withListener)
+        {
+            var go = new GameObject(name);
+            var cam = go.AddComponent<Camera>();
+            cam.fieldOfView = 55f;
+            cam.nearClipPlane = 0.05f;
+            cam.farClipPlane = 50f; // the 1:1 world is ~1 km away and stays out of view
+            cam.rect = viewport;
+            if (withListener)
+            {
+                go.tag = "MainCamera";
+                go.AddComponent<AudioListener>();
+            }
+
+            go.transform.position = position;
+            go.transform.LookAt(lookAt);
+            return cam;
         }
 
         // Miniature (0.0075 scale) geometry with default shadow bias shows dark
@@ -332,6 +478,8 @@ namespace MindXEditor
             }
 
             mat.color = color;
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0f); // matte: no glare
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(mat);
             go.GetComponent<Renderer>().sharedMaterial = mat;
         }

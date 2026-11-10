@@ -140,6 +140,27 @@ at the end of every session, in the same commit as the work.
   Unity source flipped real→sham→real exactly at the operator's two Enters
   (HUD timeline `REAL@0 SHAM@128 REAL@188`); real peak 0.71–0.80, sham ~0.2–0.36.
   Tests: backend 59, Unity EditMode 26.
+  **Game mechanics (added later the same day):** coins and scoring did NOT exist
+  anywhere in the repo or its history (only a line in the CLAUDE.md diagram), so
+  they were built: `Coin` (+ saved `Assets/Prefabs/Coin.prefab`, spinning gold disc,
+  trigger, respawns after 20 s), `CarScore` (+10 per coin, −5 per car-to-car crash
+  to BOTH cars with a 1.5 s cooldown; may go negative), `ScoreHud` (own score in
+  each player's own viewport + TEAM coins). 24 coins on 3 lanes, placed by
+  ray-casting the inner/outer walls. Brain → speed → coins: measured ~10 coins/min
+  at 5 m/s vs 20–26 coins/min at 15 m/s (level 0.7); only 24 coins, so it saturates
+  at high speed. In hyperscanning both cars share one level, so this is a TEAM
+  challenge; per-player competition needs Individual mode (O7, open).
+  **Autopilot (`TrackAutopilot`):** wall-following steering (rays), per-car lane
+  ±2.4 m + weave 1.4 m (periods 23/31 s) so the cars take different lines; speed
+  still comes from the level. Stress test at fixed 8/13/18 m/s (35–55 s each, 1–2+
+  laps): 0 wall hits, 0 crashes, 0 recoveries. Earlier version hit walls at 20 m/s;
+  the fix was fading the lateral term near corners. The table scene now has TWO
+  headset views side by side (P1/P2 seats, opposite sides), light from the side
+  (a seat looking into the light washed out), matte table. Game view fixed at
+  1920×1080 with `PlayModeWindow.SetCustomRenderingResolution` (the MCP command
+  sandbox forbids `System.Reflection`; don't work around it). Pitfall found twice:
+  runtime-only caches/lists are lost when the scene reloads for Play — serialize
+  them (ScoreHud entries) or rebuild lazily (ScaledTwin). Tests: Unity 44.
 
 - **2026-10-05** — MNE Phase 2 (`4ad6f55`). Found the venv lacked mne, so the
   Phase 1 oracle tests had been silently skipping. Cross-language wire contract +

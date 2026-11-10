@@ -20,6 +20,9 @@ namespace MindX
         [SerializeField] private Vector3 tableOrigin;
         [SerializeField] private float scale = 0.0075f;
 
+        private Coin _coin;
+        private Renderer[] _renderers;
+
         /// <summary>
         /// Maps a simulation position to its place on the table.
         /// </summary>
@@ -46,6 +49,8 @@ namespace MindX
             simOrigin = simulationOrigin;
             tableOrigin = tableAnchor;
             scale = tableScale;
+            _coin = sourceTransform != null ? sourceTransform.GetComponent<Coin>() : null;
+            _renderers = GetComponentsInChildren<Renderer>(true);
             Sync();
         }
 
@@ -59,8 +64,25 @@ namespace MindX
                 return;
             }
 
+            if (_renderers == null)
+            {
+                // Runtime-only caches; they are not serialized, so rebuild after a scene load.
+                _renderers = GetComponentsInChildren<Renderer>(true);
+                _coin = source.GetComponent<Coin>();
+            }
+
             transform.SetPositionAndRotation(MapPosition(source.position, simOrigin, tableOrigin, scale), source.rotation);
             transform.localScale = Vector3.one * scale;
+
+            // A twin of a coin disappears while the real coin is collected.
+            if (_coin != null && _renderers != null)
+            {
+                bool visible = _coin.Available;
+                foreach (Renderer r in _renderers)
+                {
+                    r.enabled = visible;
+                }
+            }
         }
 
         private void LateUpdate()
